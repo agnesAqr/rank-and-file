@@ -114,6 +114,19 @@ AI는 아래를 정하지 않는다. 안을 낼 때는 `docs/decisions.md`에 "�
 
 ## 9. 커밋
 
-- 커밋과 푸시는 사람이 요청할 때만 한다. 커밋 메시지는 한국어 한 줄로 쓴다.
+- 커밋과 푸시는 사람이 요청할 때만 한다.
+- 커밋 메시지 첫 줄은 `타입: 요약` 형식으로 쓴다. 타입은 아래 일곱 가지 중 하나이고 영문 소문자로 쓴다. 요약은 한국어 한 줄이다. 예: `test: 골든 벡터 20건 테스트 추가`
+
+| 타입 | 쓰는 경우 |
+|---|---|
+| `feat` | 새로운 기능 추가 |
+| `fix` | 버그 수정 |
+| `docs` | 문서 수정 (`AGENTS.md`, `docs/`, `README.md`) |
+| `style` | 코드 스타일 수정 (기능 변경 없음) |
+| `refactor` | 코드 구조 개선 |
+| `test` | 테스트 코드 추가 |
+| `chore` | 기타 작업 (빌드 설정 등) |
+
+- 한 커밋에는 한 타입의 변경만 담는다. 두 타입이 섞이면 커밋을 나눈다.
 - 빌드 생성물(`Binaries/`, `Intermediate/`, `Saved/`, `DerivedDataCache/`)은 커밋하지 않는다.
 - 50MiB를 넘는 파일은 커밋하기 전에 알린다. GitHub는 50MiB를 넘으면 경고하고 100MiB를 넘으면 받지 않는다([GitHub Docs](https://docs.github.com/en/repositories/working-with-files/managing-large-files/about-large-files-on-github)).
