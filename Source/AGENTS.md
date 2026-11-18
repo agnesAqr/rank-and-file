@@ -8,7 +8,7 @@
 |---|---|---|---|---|
 | `RankCore` | Runtime | 엔진 `Core`만 | 규칙, 전투, 이벤트 로그, 해시, 링크 계산, 배치 판정 | 포함 |
 | `RankGame` | Runtime | `RankCore` | 런 진행, 전투 재생, UI, 설정, DataTable 행 구조체와 코어 구조체의 변환 | 포함 |
-| `RankEditor` | Editor | `RankCore`, `RankGame` | JSON → DataTable 임포터, BalanceSim·RankGolden 커맨들릿(commandlet) | 제외 |
+| `RankEditor` | Editor | `RankCore`, `RankGame` | CSV → DataTable 임포터, BalanceSim·RankRegression 커맨들릿(commandlet) | 제외 |
 | `RankTests` | Editor | `RankCore`, `RankGame` | 자동화 테스트 | 제외 |
 
 - 의존은 한 방향이다: `RankEditor`·`RankTests` → `RankGame` → `RankCore`. 거꾸로 include하지 않는다.

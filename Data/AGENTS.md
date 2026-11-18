@@ -4,9 +4,9 @@
 
 | 폴더 | 내용 | AI가 써도 되는가 |
 |---|---|---|
-| `defs/units.json`, `defs/rules.json` | 병과 수치, 규칙 매개변수 | 사람이 정한 값을 옮겨 적을 때만 |
+| `defs/units.csv`, `defs/rules.csv` | 병과 수치, 규칙 매개변수 | 사람이 정한 값을 옮겨 적을 때만 |
 | `candidates/roundN/` | AI가 낸 후보 | 된다. 후보는 여기에만 쓴다 |
-| `accepted/squads.json`, `relics.json`, `formations.json` | 채택본 | 사람이 후보 id를 짚어 채택을 지시했을 때만 |
+| `accepted/squads.csv`, `relics.csv`, `formations.csv` | 채택본 | 사람이 후보 id를 짚어 채택을 지시했을 때만 |
 | `reports/` | 관문 기록, BalanceSim CSV | 도구가 쓴다. 손으로 고치지 않는다 |
 
 ## 세 관문
@@ -24,7 +24,7 @@
 목표 곡선(밤 1~12의 탐색 봇 승률): 90, 86, 82, 70, 78, 74, 70, 58, 66, 60, 54, 45%.
 
 후보를 생성하기 전에 끝나 있어야 하는 것. 하나라도 없으면 생성을 시작하지 않고 알린다.
-- 병과 수치 확정(`defs/units.json`). 기획 단계 점검에서 전원 척후 덱이 혼합 덱보다 잘 이겼다 [산정]. 기반이 어긋난 채 걸러 내면 수치를 고친 뒤 전부 다시 돌려야 한다.
+- 병과 수치 확정(`defs/units.csv`). 기획 단계 점검에서 전원 척후 덱이 혼합 덱보다 잘 이겼다 [산정]. 기반이 어긋난 채 걸러 내면 수치를 고친 뒤 전부 다시 돌려야 한다.
 - 시작 덱과 밤별 기대 덱 크기. 탐색 봇과 목표 곡선이 여기에 달려 있다.
 - `RankCore` 기준 확정과 BalanceSim 동작.
 
@@ -44,48 +44,62 @@
 
 ## 형식
 
-식별자 문자열의 기준은 `tools/validate_content.js`의 목록이다. 아래 예시에 없는 문자열을 지어내지 않는다.
+콘텐츠와 수치 파일은 모두 CSV다(2026-11-18 결정). 식별자 문자열의 기준은 `tools/validate_content.js`의 목록이다. 아래 예시에 없는 문자열을 지어내지 않는다.
 
-분대
+CSV 공통 규칙
+- 인코딩은 UTF-8이다. 엑셀에서는 "CSV UTF-8(쉼표로 분리)"로 저장한다. 파일 앞의 BOM은 있어도 된다. UTF-8이 아닌 파일은 관문 1에서 탈락한다.
+- 첫 줄은 열 이름이고, 한 줄에 항목 하나를 적는다. 열 이름과 순서는 아래 예시를 따른다.
+- 구분자는 쉼표다. 값에 쉼표나 큰따옴표가 들어가면 값 전체를 큰따옴표로 감싸고, 안의 큰따옴표는 두 번 쓴다.
+- 줄바꿈은 CRLF와 LF를 모두 받는다.
+- 빈 칸은 "값 없음"이다. 참과 거짓은 `TRUE`, `FALSE`로 쓴다.
+- 첫 열(`id` 또는 `key`)이 DataTable의 행 이름이 된다. [미확인] 5.8의 CSV 임포트가 첫 열을 행 이름으로 쓰는지는 엔진 소스로 확인하고 이 표시를 지운다.
+- 테스트 기록(`Source/RankTests/Fixtures/*.json`)과 검사기가 내는 탈락 사유는 콘텐츠가 아니므로 JSON으로 둔다.
 
-```json
-{ "id": "sq_K_L3_02", "name": "성벽 방패대", "class": "K", "shape": [[0,0],[1,0],[1,1]], "tier": 2,
-  "trait": { "when": "OnHit", "do": "Shield", "who": "Linked", "n": 2, "limit": 3 } }
+분대 (`accepted/squads.csv`)
+
+```csv
+id,name,class,shape,tier,traitWhen,traitDo,traitWho,traitN,traitLimit
+sq_K_L3_02,성벽 방패대,K,0:0;1:0;1:1,2,OnHit,Shield,Linked,2,3
 ```
 
 - `class`: `K` 방패병, `B` 광전사, `R` 석궁수, `M` 마법사, `H` 척후.
-- `shape`: [행, 열] 1~4칸. 칸은 상하좌우로 이어져야 한다. 같은 모양을 돌린 것은 중복이다. [미정] 거울상(예: L과 J)을 같은 모양으로 볼지는 정해지지 않았다.
-- `trait`: 0~1개. 언제 5종(전투 시작, 공격할 때, 맞을 때, 처치할 때, 아군이 쓰러질 때) × 무엇 6종(공격+, 방어+, 회복, 보호막, 간격−, 성문 수리) × 누구 5종(자신, 링크된 이웃, 같은 열, 같은 분대, 아군 전체). `n`은 수치, `limit`은 전투당 발동 횟수다.
+- `shape`: 칸 1~4개를 `행:열`로 적고 `;`로 잇는다. 칸은 상하좌우로 이어져야 한다. 같은 모양을 돌린 것은 중복이다. 거울상(예: L과 J)은 다른 모양이다. 분대는 뒤집지 않는다(11/18, `docs/rules.md` §2.1).
+- `trait*`: 특성 0~1개. 없으면 다섯 칸을 모두 비운다. 언제(`traitWhen`) 5종(전투 시작, 공격할 때, 맞을 때, 처치할 때, 아군이 쓰러질 때) × 무엇(`traitDo`) 6종(공격+, 방어+, 회복, 보호막, 간격−, 성문 수리) × 누구(`traitWho`) 5종(자신, 링크된 이웃, 같은 열, 같은 분대, 아군 전체). `traitN`은 수치, `traitLimit`은 전투당 발동 횟수다.
 
-해골 진형
+해골 진형 (`accepted/formations.csv`)
 
-```json
-{ "id": "fm_n07_a", "night": 7, "kind": "normal", "rows": ["wwmmww", "mrmmrm", ".g..g.", "..rr.."] }
+```csv
+id,night,kind,row0,row1,row2,row3
+fm_n07_a,7,normal,wwmmww,mrmmrm,.g..g.,..rr..
 ```
 
-- `rows`: 4행 × 6자. 첫 줄이 행 0(최전열)이다. `m` 졸개, `w` 전사, `r` 궁수, `g` 술사, `.` 빈칸.
+- `row0`~`row3`: 행마다 6자. `row0`이 행 0(최전열)이다. `m` 졸개, `w` 전사, `r` 궁수, `g` 술사, `.` 빈칸.
 - `night`: 1~12. 밤마다 3개를 둔다. 4·8번째 밤은 정예, 12번째 밤은 우두머리다.
 
-유물
+유물 (`accepted/relics.csv`)
 
-```json
-{ "id": "rl_dawn_bell", "name": "새벽의 종", "effect": { "kind": "Rule", "param": "MaxTicks", "delta": -50 } }
+```csv
+id,name,effectKind,effectParam,effectDelta
+rl_dawn_bell,새벽의 종,Rule,MaxTicks,-50
 ```
 
 - [미정] 유물과 특성의 처리 시점이 정해지지 않았다(`docs/design.md` 6.8절). 정해지기 전에는 이 형식을 늘리지 않는다.
+
+후보(`candidates/roundN/`)도 같은 열을 쓴다.
 
 id는 분대 `sq_{병과}_{모양}_{번호}`, 진형 `fm_n{밤 두 자리}_{a~c}`, 유물 `rl_{영문 소문자와 밑줄}`이다. 채택된 id는 바꾸지 않는다. 리포트와 결정 기록이 id로 가리킨다.
 
 ## defs
 
-- `units.json`: 병과 9종(`K`, `B`, `R`, `M`, `H`, `m`, `w`, `r`, `g`)의 체력, 공격, 방어, 간격, 사거리, 표적, 마법 여부, 부활 값, 링크 효과.
-- `rules.json`: 열 6, 행 4, 최대 600틱, 성문과 결계 60, 성문 피해 1.
+- `units.csv`: 열은 `key,name,hp,atk,armor,interval,range,target,magic,revive,linkStat,linkAmount`. 병과 9종(`K`, `B`, `R`, `M`, `H`, `m`, `w`, `r`, `g`)의 체력, 공격, 방어, 간격, 사거리, 표적, 마법 여부, 부활 값, 링크 효과.
+- `rules.csv`: 열은 `cols,rows,maxTicks,gateHp,gateDamage,linkStackMax,rangeMax,intervalMin`이고 데이터는 한 줄이다. 열 6, 행 4, 최대 600틱, 성문과 결계 60, 성문 피해 1, 링크 겹 상한 3, 사거리 상한 4, 간격 하한 4.
+- `target`은 `Front`(맨 앞), `Back`(맨 뒤), `Support`(지원), `Area`(범위). `linkStat`은 `None`, `Armor`, `Atk`, `Range`, `Hp`, `Interval`이고, `linkAmount`는 한 겹의 크기다(간격은 −1처럼 음수).
 - 지금 값은 [초기값]이다. 조정안은 낼 수 있지만 값은 사람이 정한다.
-- 값을 바꾸면 순서대로 한다: 영향을 받는 손계산 시나리오의 기대값을 AI가 다시 계산하고 사람이 확인한다 → `tools\run_tests.bat`으로 바뀐 골든 벡터를 확인해 사람에게 보인다 → 승인 뒤 `tools\record_golden.bat` → BalanceSim으로 문서의 수치를 다시 잰다 → `docs/decisions.md`에 전후 값과 근거를 적는다.
+- 값을 바꾸면 순서대로 한다: 영향을 받는 손계산 시나리오의 기대값을 AI가 다시 계산하고 사람이 확인한다 → `tools\run_tests.bat`으로 회귀 테스트에서 결과가 바뀐 대전을 확인해 사람에게 보인다 → 승인 뒤 `tools\record_regression.bat` → BalanceSim으로 문서의 수치를 다시 잰다 → `docs/decisions.md`에 전후 값과 근거를 적는다.
 
 ## reports
 
 - CSV는 도구가 낸 그대로 둔다. 숫자를 손으로 고치지 않는다. 요약과 해석은 따로 적는다.
 - 리포트마다 조건을 남긴다: 명령, 시드, 판 수, 콘텐츠 버전 해시, 커밋.
 - 같은 명령과 같은 시드는 같은 CSV를 내야 한다. 다르면 버그로 알린다.
-- 콘텐츠 버전 해시는 채택본 JSON 3개와 `defs` 2개의 내용을 FNV-1a로 묶은 값이다. `accepted/`나 `defs/`가 바뀌면 해시가 바뀐다. 예전 해시로 잰 수치를 지금 콘텐츠의 수치처럼 쓰지 않는다.
+- 콘텐츠 버전 해시는 채택본 CSV 3개와 `defs` CSV 2개의 내용을, BOM을 빼고 줄바꿈을 LF로 맞춘 뒤 FNV-1a로 묶은 값이다. `accepted/`나 `defs/`가 바뀌면 해시가 바뀐다. 예전 해시로 잰 수치를 지금 콘텐츠의 수치처럼 쓰지 않는다.
