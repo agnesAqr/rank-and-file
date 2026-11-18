@@ -1,0 +1,10 @@
+key,name,hp,atk,armor,interval,range,target,magic,revive,linkStat,linkAmount
+K,방패병,40,2,1,10,1,Front,FALSE,0,Armor,1
+B,광전사,28,5,0,10,1,Front,FALSE,0,Atk,1
+R,석궁수,16,4,0,12,3,Support,FALSE,0,Range,1
+M,마법사,14,3,0,16,4,Area,TRUE,0,Hp,5
+H,척후,18,3,0,9,2,Back,FALSE,0,Interval,-1
+m,해골 졸개,12,2,0,10,1,Front,FALSE,6,None,0
+w,해골 전사,32,3,1,12,1,Front,FALSE,0,None,0
+r,해골 궁수,16,3,0,12,3,Support,FALSE,0,None,0
+g,해골 술사,16,2,0,18,4,Area,TRUE,0,None,0
