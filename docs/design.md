@@ -26,7 +26,7 @@
 
 | 날짜 | 목표 | 그날의 판정 |
 |---|---|---|
-| 11/16 | 코어 구현과 테스트 | A: 손계산 시나리오 전부, 결정성·미러 각 1,000/1,000, 등가성 10,000/10,000, 본인 리뷰 → 기준 확정과 골든 벡터 기록 |
+| 11/16 | 코어 구현과 테스트 | A: 손계산 시나리오 전부, 결정성·미러 각 1,000/1,000, 등가성 10,000/10,000, 본인 리뷰 → 기준 확정과 회귀 테스트 결과 기록 |
 | 11/17 | 화면에서 한 판 | B: 배치 → 전투 → 결과가 멈추지 않고 돈다 |
 | 11/18 | 한 런과 시뮬레이터 | C: Shipping 빌드로 12밤 완주 |
 | 11/19 | AI 콘텐츠 | 12밤 중 10밤 이상이 목표 승률 ±5%p |
@@ -48,7 +48,7 @@
 2. 처음 하는 사람이 설명 없이 첫 밤을 이긴다(지인 2명)
 3. Shipping 빌드로 3런 연속 크래시가 없다
 4. 해상도, 창 모드, 음량 설정과 일시정지, 재시작, 메인 메뉴가 있다
-5. 결정성·미러·골든 벡터 테스트 통과 기록이 README에 있다
+5. 결정성·미러·회귀 테스트 통과 기록이 README에 있다
 6. 프레임 타임을 PC 사양, 빌드 구성, 장면과 함께 기록했다
 7. 크레딧 화면에 에셋 출처가 있고 타인 저작물이 없다
 
@@ -58,7 +58,7 @@
 
 1. **규칙은 한 곳에만 둔다.** 전투 결과를 바꾸는 코드는 `RankCore`에만 있다. 화면 쪽은 체력을 다시 계산하지 않고 이벤트의 값을 그대로 보여 준다.
 2. **코어는 결정론이다.** 정수 연산, 고정 틱, 고정된 순회 순서, 한 틱의 행동은 모아서 한꺼번에 적용, 전투 안에는 난수가 없다 (기획서 §4).
-3. **콘텐츠는 데이터다.** 분대, 유물, 해골 진형, 병과 수치는 JSON에서 온다. 코드는 정해진 어휘 조각만 구현한다 (기획서 §3).
+3. **콘텐츠는 데이터다.** 분대, 유물, 해골 진형, 병과 수치는 CSV에서 온다(11/18 JSON에서 변경). 코드는 정해진 어휘 조각만 구현한다 (기획서 §3).
 4. **확인할 수 있는 것만 AI에게 맡긴다.** 모든 작업은 완료 기준과 검증 명령을 먼저 적고 시작한다 (기획서 §6).
 
 ## 4. 전체 구조
@@ -67,7 +67,7 @@
 
 ```mermaid
 flowchart LR
-  JSON["Data/accepted/*.json<br>분대, 유물, 진형, 병과 수치"] --> ED["RankEditor<br>임포터, BalanceSim"]
+  JSON["Data/accepted/*.csv<br>분대, 유물, 진형, 병과 수치"] --> ED["RankEditor<br>임포터, BalanceSim"]
   ED --> DT["Content/Data<br>DataTable 에셋"]
   DT --> GAME["RankGame<br>런 진행, 재생, UI"]
   GAME -->|"FBattleInput"| CORE["RankCore<br>전투 규칙, 순수 C++"]
@@ -75,14 +75,14 @@ flowchart LR
   ED -->|"화면 없이 1만 판"| CORE
   TESTS["RankTests<br>자동화 테스트"] --> CORE
   HAND["docs/rules.md<br>손계산 시나리오(AI 계산, 본인 확인)"] -->|"기대값"| TESTS
-  CORE -->|"기준 확정 뒤 골든 벡터 기록"| TESTS
+  CORE -->|"기준 확정 뒤 회귀 테스트 결과 기록"| TESTS
 ```
 
 | 모듈 | 타입 | 의존 | 맡는 일 | Shipping 포함 |
 |---|---|---|---|---|
 | `RankCore` | Runtime | 엔진 Core만 | 규칙, 전투, 이벤트 로그, 해시, 링크 계산, 배치 판정 | 포함 |
 | `RankGame` | Runtime | RankCore | 런 진행, 전투 재생, UI, 설정, DataTable 행 구조체와 코어 구조체 변환 | 포함 |
-| `RankEditor` | Editor | RankCore, RankGame | JSON → DataTable 임포터, BalanceSim·RankGolden 커맨들릿(commandlet) | 제외 |
+| `RankEditor` | Editor | RankCore, RankGame | CSV → DataTable 임포터, BalanceSim·RankRegression 커맨들릿(commandlet) | 제외 |
 | `RankTests` | Editor [제안] | RankCore, RankGame | 자동화 테스트 | 제외 |
 
 - 모듈 4개와 그 역할은 기획서 §4를 따른다.
@@ -95,7 +95,7 @@ flowchart LR
 |---|---|
 | `RankCore`는 UObject, UWorld, 엔진 난수, float을 쓰지 않는다 | 결정론과 화면 없는 실행 |
 | `RankGame`은 전투 결과를 계산하지 않는다. 배치 화면의 링크 미리보기도 `RankCore` 함수를 부른다 | 화면과 시뮬레이터가 다른 답을 내지 않게 한다 |
-| 콘텐츠를 읽는 경로는 하나다: JSON → 행 구조체 → 코어 구조체 | 게임과 시뮬레이터가 다른 데이터를 보지 않게 한다 |
+| 콘텐츠를 읽는 경로는 하나다: CSV → 행 구조체 → 코어 구조체 | 게임과 시뮬레이터가 다른 데이터를 보지 않게 한다 |
 | 수치는 코드에 적지 않는다. 병과 수치와 규칙 매개변수도 데이터다 | 밸런스 조정 때 코드를 고치지 않는다 |
 
 ### 4.3 한 밤의 데이터 흐름
@@ -120,15 +120,16 @@ rank-and-file/
 │  ├─ decisions.md            결정 기록: 날짜, 결정, 대안, 근거, 상태
 │  └─ devlog/2026-11-16.md    개발 일지 4칸
 ├─ tools/
-│  ├─ record_golden.bat       기준으로 확정된 RankCore로 골든 벡터 기록
+│  ├─ record_regression.bat       기준으로 확정된 RankCore로 회귀 테스트 결과 기록
 │  ├─ validate_content.js     관문 1 스키마 검사
 │  ├─ run_tests.bat           테스트 한 줄 실행
 │  ├─ run_sim.bat             BalanceSim 실행
-│  └─ package.bat             Shipping 패키지
+│  ├─ package.bat             Shipping 패키지
+│  └─ check_shipping_determinism.bat  Shipping 패키지로 회귀 테스트 입력을 돌려 기록과 비교(T11)
 ├─ Data/
-│  ├─ defs/units.json, rules.json      병과 수치, 규칙 매개변수
+│  ├─ defs/units.csv, rules.csv        병과 수치, 규칙 매개변수
 │  ├─ candidates/round1/               AI가 낸 후보
-│  ├─ accepted/squads.json, relics.json, formations.json
+│  ├─ accepted/squads.csv, relics.csv, formations.csv
 │  └─ reports/                         관문 기록, BalanceSim CSV
 ├─ Content/
 │  ├─ Data/                   DataTable 에셋
@@ -140,7 +141,7 @@ rank-and-file/
    ├─ RankCore/
    ├─ RankGame/
    ├─ RankEditor/
-   └─ RankTests/Fixtures/hand_v1.json, golden_v1.json
+   └─ RankTests/Fixtures/hand_v1.json, regression_branches.csv, regression_inputs.csv, regression_battles_v1.json
 ```
 
 11/16 추가: `AGENTS.md`는 루트 말고도 `docs/`, `tools/`, `Data/`, `Content/`, `Source/`와 모듈 4개 폴더에 하나씩 둔다(모두 10개). 루트 파일이 공통 규칙이고 하위 파일은 그 폴더의 규칙만 더한다. Claude Code는 `CLAUDE.md`가 없는 저장소에서 `AGENTS.md`를 프로젝트 지침으로 읽고, 하위 폴더의 것은 그 폴더의 파일을 Read 도구로 열 때 불러온다([Claude Code Docs: memory](https://code.claude.com/docs/en/memory)). 그래서 루트 규칙에 "만들거나 고치기 전에 직접 읽는다"를 넣었다.
@@ -152,14 +153,14 @@ rank-and-file/
 ```cpp
 namespace Rank
 {
-    struct FUnitDef    { uint8 Key; int32 Hp, Atk, Armor, Interval, Range; ETarget Target; bool bMagic; int32 Revive; ELinkStat Link; };
-    struct FRuleParams { int32 Cols = 6, Rows = 4, MaxTicks = 600, GateHp = 60, Breach = 1; bool bLinks = true; };
+    struct FUnitDef    { uint8 Key; int32 Hp, Atk, Armor, Interval, Range; ETarget Target; bool bMagic; int32 Revive; ELinkStat Link; int32 LinkAmount; };
+    struct FRuleParams { int32 Cols = 6, Rows = 4, MaxTicks = 600, GateHp = 60, Breach = 1, LinkStackMax = 3, RangeMax = 4, IntervalMin = 4; bool bLinks = true; };  // 값은 Data/defs/rules.csv에서 채운다
     struct FFormation  { uint8 Cells[4][6]; };                 // 칸마다 병과 키, 빈칸은 0. 행 0이 최전열
     struct FBattleInput{ FFormation Side[2]; FRuleParams Rules; const FUnitDef* Defs; int32 NumDefs; };
     struct FBattleEvent{ int32 Tick; uint8 Type; int32 Actor; int32 Target; int32 Value; };
     struct FBattleResult
     {
-        EOutcome Outcome;            // A, B, Draw, Timeout
+        EOutcome Outcome;            // A, B, Draw, Timeout, Invalid(입력 오류, rules.md §3.6)
         int32 Tick; uint32 Hash; int32 NumEvents; int32 Gate[2];
         int32 Alive[2]; int32 HpSum[2];
         TArray<FBattleEvent> Log;    // 기록 옵션을 켰을 때만 채운다
@@ -189,25 +190,25 @@ namespace Rank
 | r | 해골 궁수 | 16 | 3 | 0 | 12 | 3 | 지원 | | 없음 |
 | g | 해골 술사 | 16 | 2 | 0 | 18 | 4 | 범위 | 마법 | 없음 |
 
-규칙 매개변수: 진형판 6열 × 4행, 최대 600틱(1틱 = 0.1초), 성문과 결계 60, 성문 피해 1.
+규칙 매개변수: 진형판 6열 × 4행, 최대 600틱(1틱 = 0.1초), 성문과 결계 60, 성문 피해 1, 링크 겹 상한 3, 사거리 상한 4, 간격 하한 4. 뒤의 셋은 11/18에 규칙 문장에서 데이터로 옮겼다(값은 그대로, `docs/rules.md` §9 14번).
 
 ### 6.3 유닛 생성과 링크
 
-아래 순서와 식은 `docs/rules.md`에 조항으로 옮겨 구현의 기준으로 쓴다. 참조 구현에서 읽어 낸 것이므로 본인이 확정하기 전에는 [제안]이다.
+아래 순서와 식은 `docs/rules.md`에 조항으로 옮겨 구현의 기준으로 쓴다. 참조 구현에서 읽어 낸 것이라 [제안]이었고, 11/18 `docs/rules.md` 확정(확정 · 본인)으로 기준은 `docs/rules.md`가 됐다. 둘이 다르면 `docs/rules.md`를 따른다.
 
 1. 진영 0(플레이어) → 1(해골), 행 0 → 3, 열 0 → 5 순서로 칸을 훑어 유닛을 만든다.
 2. 유닛 번호 = 진영 × 100 + 행 × 6 + 열. 이 번호가 해시에 들어간다.
 3. 유닛은 자기 열의 대열 뒤에 붙는다. 행 0이 대열 맨 앞이다. 빈칸은 대열에서 사라진다 (기획서 §2.3).
-4. 링크: 상하좌우 이웃의 병과가 다르고 그 병과에 링크 효과가 있으면 그 효과를 한 겹 받는다. 해골은 링크 효과가 없으므로 링크를 주지도 받지도 않는다.
-5. 최종 능력치
+4. 링크: 상하좌우 이웃의 병과가 다르고 그 병과에 링크 효과가 있으면 그 효과를 한 겹 받는다. 해골은 링크 효과가 없으므로 링크를 주지도 받지도 않는다. 링크는 병과로만 정하고 진영은 보지 않는다(11/18, `docs/rules.md` §3.3).
+5. 최종 능력치 (11/18: 한 겹의 크기 a와 상한·하한을 데이터에서 읽는다. n은 받은 겹 수)
 
 | 능력치 | 식 |
 |---|---|
-| 방어 | 기본 + min(방어 링크, 3) |
-| 공격 | 기본 + min(공격 링크, 3) |
-| 사거리 | min(기본 + min(사거리 링크, 3), 4) |
-| 최대 체력 | 기본 + 5 × min(체력 링크, 3) |
-| 간격 | max(기본 − min(간격 링크, 3), 4) |
+| 방어 | 기본 + a × min(n, 겹 상한) |
+| 공격 | 기본 + a × min(n, 겹 상한) |
+| 사거리 | min(기본 + a × min(n, 겹 상한), 사거리 상한) |
+| 최대 체력 | 기본 + a × min(n, 겹 상한) |
+| 간격 | max(기본 + a × min(n, 겹 상한), 간격 하한) |
 
 6. 대기 시간(cd)의 처음 값은 간격이다. 첫 공격은 간격 번째 틱에 나간다.
 
@@ -219,8 +220,8 @@ namespace Rank
 |---|---|
 | ① 의도 수집 | 진영 0 → 1, 열 0 → 5, 대열 앞 → 뒤 순서. cd가 0보다 크면 1 줄인다. cd가 아직 0보다 크거나 대열 순번이 사거리 이상이면 건너뛴다(cd는 0에 머문다: 준비된 채 대기). 아니면 표적을 고르고 cd를 간격으로 되돌린다 |
 | ② 의도 없음 | 이번 틱에 의도가 하나도 없으면 ③~⑤를 건너뛴다 |
-| ③ 적용 | 수집한 순서대로 적용한다. 표적은 ①에서 고른 것을 바꾸지 않는다. 이미 체력이 0 이하가 된 표적에도 그대로 적용한다 |
-| ④ 사망 정리 | 진영 0 → 1, 열 0 → 5, 대열 앞 → 뒤 순서. 체력이 0 이하이고 부활 값이 있으면 체력을 그 값으로 바꾸고 부활 값을 0으로 한다(자리는 그대로). 부활 값이 없으면 대열에서 뺀다. 뒤의 유닛이 앞으로 당겨진다 |
+| ③ 적용 | 수집한 순서대로 적용한다. 표적은 ①에서 고른 것을 바꾸지 않는다. 이미 체력이 0 이하가 된 표적에도 그대로 적용한다. 기록하는 피해는 계산한 값 그대로이고, 체력과 성문은 0 아래로도 내려간다(11/18) |
+| ④ 사망 정리 | 진영 0 → 1, 열 0 → 5, 대열 앞 → 뒤 순서. 체력이 0 이하이고 부활 값이 있으면 체력을 그 값으로 바꾸고 부활 값을 0으로 한다(자리는 그대로). 부활 값이 없으면 대열에서 뺀다. 뒤의 유닛이 앞으로 당겨지고, 당겨진 유닛의 cd는 그대로다(11/18) |
 | ⑤ 판정 | 한쪽의 성문이 0 이하이거나 모든 열이 비면 그쪽이 진 것이다. 양쪽이 같은 틱에 지면 무승부다 |
 
 600틱까지 끝나지 않으면 시간 초과(Timeout)이고 틱은 600으로 기록한다.
@@ -232,7 +233,7 @@ namespace Rank
 | 맨 앞 | 마주 보는 열의 맨 앞. 열이 비면 상대 성문 |
 | 맨 뒤 | 마주 보는 열의 맨 뒤. 열이 비면 상대 성문 |
 | 지원 | 마주 보는 열의 맨 앞. 비면 거리 1부터 5까지, 같은 거리에서는 왼쪽 열을 먼저 본다. 모두 비면 상대 성문 |
-| 범위 | 왼쪽, 가운데, 오른쪽 세 열의 맨 앞을 열 번호 순서로 모두. 셋 다 비면 상대 성문을 한 번 |
+| 범위 | 왼쪽, 가운데, 오른쪽 세 열의 맨 앞을 열 번호 순서로 모두. 진형판 밖의 열은 빈 열로 본다. 셋 다 비면 상대 성문을 한 번 |
 
 피해 (기획서 §2.6): 마법은 공격 값 그대로, 물리는 max(1, 공격 − 방어), 성문은 성문 피해 값(1).
 
@@ -258,6 +259,8 @@ namespace Rank
 | 종료 | | 마지막 틱, 결과 코드(A 1, B 2, Draw 3, Timeout 4) |
 
 이벤트 로그의 항목도 같은 종류 값과 필드를 쓴다. 재생기와 디버깅이 같은 로그를 본다.
+
+11/18: 로그 한 줄은 틱, 종류, 행위자, 표적, 값이다. 부활은 유닛 번호, 유닛 번호, 부활한 뒤의 체력, 사망은 유닛 번호, 유닛 번호, 0을 적는다. 종료는 로그와 이벤트 수에 넣지 않고 해시에만 섞는다. 이벤트 수는 종류 1~4인 로그 줄의 개수다(`docs/rules.md` §6).
 
 ### 6.6 결정론 점검표 (코드 리뷰 기준)
 
@@ -300,37 +303,35 @@ namespace Rank
 
 | 종류 | 출시 목표 | 후보 수 | 파일 |
 |---|---|---|---|
-| 분대 카드 | 24 | 60 | `accepted/squads.json` |
-| 유물 | 12 | 30 | `accepted/relics.json` |
-| 해골 진형 | 36 (밤마다 3개) | 90 | `accepted/formations.json` |
-| 병과 수치 | 9 | | `defs/units.json` |
-| 규칙 매개변수 | 1 | | `defs/rules.json` |
+| 분대 카드 | 24 | 60 | `accepted/squads.csv` |
+| 유물 | 12 | 30 | `accepted/relics.csv` |
+| 해골 진형 | 36 (밤마다 3개) | 90 | `accepted/formations.csv` |
+| 병과 수치 | 9 | | `defs/units.csv` |
+| 규칙 매개변수 | 1 | | `defs/rules.csv` |
 
 ### 7.2 형식
 
-분대 (기획서 §5의 예시)
+11/18 결정으로 모두 CSV다. 공통 규칙(UTF-8, 첫 줄 열 이름, 쉼표 구분)과 열 설명은 `Data/AGENTS.md`의 "형식" 절이 기준이다.
 
-```json
-{
-  "id": "sq_K_L3_02",
-  "name": "성벽 방패대",
-  "class": "K",
-  "shape": [[0,0],[1,0],[1,1]],
-  "tier": 2,
-  "trait": { "when": "OnHit", "do": "Shield", "who": "Linked", "n": 2, "limit": 3 }
-}
+분대 (기획서 §5의 예시를 CSV로 편 것)
+
+```csv
+id,name,class,shape,tier,traitWhen,traitDo,traitWho,traitN,traitLimit
+sq_K_L3_02,성벽 방패대,K,0:0;1:0;1:1,2,OnHit,Shield,Linked,2,3
 ```
 
 해골 진형 [제안]
 
-```json
-{ "id": "fm_n07_a", "night": 7, "kind": "normal", "rows": ["wwmmww", "mrmmrm", ".g..g.", "..rr.."] }
+```csv
+id,night,kind,row0,row1,row2,row3
+fm_n07_a,7,normal,wwmmww,mrmmrm,.g..g.,..rr..
 ```
 
 유물 [제안]
 
-```json
-{ "id": "rl_dawn_bell", "name": "새벽의 종", "effect": { "kind": "Rule", "param": "MaxTicks", "delta": -50 } }
+```csv
+id,name,effectKind,effectParam,effectDelta
+rl_dawn_bell,새벽의 종,Rule,MaxTicks,-50
 ```
 
 카드 설명문은 데이터에 넣지 않는다. 조각에서 템플릿으로 만든다 (기획서 §5). 예: "맞을 때 링크된 이웃에게 보호막 2 (전투당 3회)".
@@ -338,9 +339,9 @@ namespace Rank
 ### 7.3 게임에 들어가는 경로
 
 1. `tools/validate_content.js`가 관문 1을 검사한다(10절).
-2. `RankEditor`의 임포터가 `Data/accepted/*.json`을 DataTable 에셋으로 바꾼다. `UDataTable::CreateTableFromJSONString`은 행 구조체가 먼저 정의돼 있어야 하고, 문제 메시지 목록을 돌려준다([Epic API: UDataTable](https://dev.epicgames.com/documentation/en-us/unreal-engine/API/Runtime/Engine/UDataTable)). 메시지가 하나라도 있으면 임포트를 실패로 처리한다.
-3. [미확인] 모양(`shape`)처럼 배열 안에 배열이 있는 필드를 이 임포터가 그대로 받는지는 확인하지 못했다. 11/18에 분대 1개로 먼저 시험하고, 안 되면 JSON을 직접 읽어 행을 채운다.
-4. 콘텐츠 버전 해시: 채택본 JSON 3개와 `defs` 2개의 내용을 FNV-1a로 묶은 값을 빌드에 넣고 결과 화면과 README에 적는다 (기획서 §5). 어느 콘텐츠로 잰 수치인지 구분하는 데 쓴다.
+2. `RankEditor`의 임포터가 `Data/accepted/*.csv`를 DataTable 에셋으로 바꾼다. [미확인] `UDataTable::CreateTableFromCSVString`(5.8 엔진 소스로 확인)을 쓴다. DataTable 임포트 함수는 행 구조체가 먼저 정의돼 있어야 하고, 문제 메시지 목록을 돌려준다([Epic API: UDataTable](https://dev.epicgames.com/documentation/en-us/unreal-engine/API/Runtime/Engine/UDataTable)). 메시지가 하나라도 있으면 임포트를 실패로 처리한다.
+3. 분대 모양은 `0:0;1:0;1:1` 같은 문자열 한 칸이다. 칸 목록으로 바꾸는 일은 `RankGame`의 변환 함수가 맡는다(11/18 CSV로 바꾸며 "배열 안의 배열" 문제가 없어졌다).
+4. 콘텐츠 버전 해시: 채택본 CSV 3개와 `defs` CSV 2개의 내용을, BOM을 빼고 줄바꿈을 LF로 맞춘 뒤 FNV-1a로 묶은 값을 빌드에 넣고 결과 화면과 README에 적는다 (기획서 §5). 어느 콘텐츠로 잰 수치인지 구분하는 데 쓴다.
 
 ## 8. RankGame 상세
 
@@ -404,6 +405,7 @@ stateDiagram-v2
 
 - 6×4 진형판, 분대 드래그, 회전(R), 링크 표시 (일정표 11/17).
 - 놓을 수 있는지는 `FFormationMask::CanPlace`, 링크와 최종 능력치 미리보기는 `Rank::ComputeLinks`로 계산한다.
+- 병사를 한 명도 놓지 않으면 전투 시작 버튼을 누를 수 없게 한다(11/18, `docs/rules.md` §3.6). 분대는 돌리기만 하고 뒤집지 않는다(§2.1).
 - [제안] 입력은 격자 위젯에서 받는다. 동작은 C++, 배치와 모양은 에디터에서 조정한다. 조작이 웹 참조 시뮬레이터와 같고, 화면 좌표를 칸으로 바꾸는 코드가 한 곳에 모인다. 3D 전장에는 놓인 결과만 보여 준다(15절 5번).
 - 판정 B에서 드래그가 안 되면 클릭 배치로 줄인다 (일정표).
 - 배치에 1분 넘게 걸리면 우클릭·휠 회전과 직전 배치 불러오기를 넣는다 (기획서 §8).
@@ -509,8 +511,9 @@ JS 참조 구현도 AI가 작성했고 본인이 검증하지 않았으므로 �
 | 2. 기대값 | 손계산 시나리오(T5)의 기대값을 C++ 결과를 보기 전에 규칙 문서로 계산하고, 틱별 계산 과정을 본인이 따라가며 확인 | AI가 계산(11/17 변경), 본인이 확인 |
 | 3. 구현 | `docs/rules.md`로 RankCore 구현 | AI 초안 |
 | 4. 검증 | T5 전부, 결정성·미러(T2·T3), 등가성(T4), 조항별 코드 리뷰 | 테스트는 자동, 리뷰는 본인 |
+| 4-1. 회귀 입력 점검 (11/18) | 갈래 집계에서 T1이 맡은 갈래가 모두 1건 이상, 변이 검사에서 변이 8개가 모두 걸림(9.5) | 자동. 입력을 고치는 승인은 본인 |
 | 5. 기준 확정 | `docs/decisions.md`에 커밋과 근거를 적는다 | 본인 |
-| 6. 회귀 | 확정 커밋으로 골든 벡터 20건(T1)을 기록하고, 이후 변경마다 비교 | 자동. 다시 기록은 본인 승인 |
+| 6. 회귀 | 확정 커밋으로 회귀 테스트 대전 20건(T1)을 기록하고, 이후 변경마다 비교. 같은 20건을 Shipping 패키지에서도 돌려 기록과 같은지 본다(T11) | 자동. 다시 기록은 본인 승인 |
 
 결과: 기획서에 쓴 [산정] 수치(54.8% → 22.8% 등)는 JS로 낸 값이다. 확정된 C++의 BalanceSim으로 다시 재서 [측정]으로 바꾼다. 다르게 나오면 C++ 값을 쓴다. 기획서의 웹 시뮬레이터(JS)는 게임과 결과가 다를 수 있으므로, 공개하려면(버리는 순서 5번) 그 전에 두 결과를 비교한다.
 
@@ -518,25 +521,32 @@ JS 참조 구현도 AI가 작성했고 본인이 검증하지 않았으므로 �
 
 | ID | 테스트 | 내용 | 통과 기준 | 넣는 날 |
 |---|---|---|---|---|
-| T1 | 골든 벡터 (회귀) | 기준으로 확정된 RankCore가 기록한 대전 20건과 지금 결과를 비교한다 | 결과, 틱, 이벤트 수, 해시가 20/20 일치 | 기준 확정 직후 |
+| T1 | 회귀 테스트 | 고정 입력(`regression_inputs.csv`) 20건을 돌려, 기준으로 확정된 RankCore가 기록한 결과와 지금 결과를 비교한다 | 결과, 틱, 이벤트 수, 해시, 성문 값, 생존 수, 체력 합, 로그 체크섬이 20/20 일치 | 기준 확정 직후 |
 | T2 | 결정성 | 무작위 대전 1,000판을 두 번씩 돌린다 | 해시 1,000/1,000 일치 | 11/16 |
 | T3 | 미러 | 무작위 배치 1,000개를 자기 자신과 붙인다 | 1,000/1,000 무승부(Draw 또는 Timeout) | 11/16 |
 | T4 | 배치 판정 등가성 | 비트마스크 판정과 칸 단위 판정을 무작위 1만 건으로 비교 | 10,000/10,000 일치 | 11/16 |
 | T5 | 손계산 시나리오 | 조항마다 1개 이상, 작은 대전의 끝 틱·승패·성문 값·지정 유닛 체력. 기획서 §2의 3건 포함. 기대값은 AI가 계산, 본인이 확인 | 전부 일치 | 11/17 |
 | T7 | 특성 조각 [제안] | 조각 16개마다 손계산 예제 2개 이상 | 전부 일치 | 11/18 |
-| T8 | 콘텐츠 | 채택본 JSON이 관문 1을 통과하고 DataTable 행 수와 같다 | 탈락 0, 행 수 일치 | 11/18 |
+| T8 | 콘텐츠 | 채택본 CSV가 관문 1을 통과하고 DataTable 행 수와 같다 | 탈락 0, 행 수 일치 | 11/18 |
 | T9 | 런 스모크 [제안] | 탐색 봇이 시드 10개로 런을 끝까지 돈다. 같은 시드를 두 번 | 멈춤과 크래시 0, 같은 시드는 같은 결과 | 11/18 |
 | T10 | 재생 일치 [제안] | 재생이 끝난 화면 상태와 `FBattleResult` 비교 | 일치 | 11/17 |
+| T11 | Shipping 결정성 | 고정 입력(`regression_inputs.csv`) 20건을 Shipping 패키지에서 돌려, 에디터에서 기록한 T1의 결과와 비교한다. `tools\check_shipping_determinism.bat` | T1과 같은 항목이 20/20 일치 | 기준 확정 직후 |
 
 T2~T5와 본인 리뷰가 판정 A의 기준이고, 통과하면 RankCore를 기준으로 확정해 T1을 기록한다(9.0절). T1~T5는 화면 없이 돈다. T6(JS와 승률 비교)은 11/17에 없앴다.
 
+T11은 11/18에 더했다. T2는 같은 빌드에서 두 번 돌리므로 빌드 구성(Development Editor와 Shipping)에 따라 결과가 갈리는 경우를 잡지 못한다. 실수 연산은 컴파일러, CPU 명령어 집합, 디버그·릴리스 빌드에 따라 결과가 달라질 수 있다는 보고가 있다([Gaffer on Games: Floating Point Determinism](https://gafferongames.com/post/floating_point_determinism/)). RankCore는 정수만 써서 이 원인을 없앴지만, 초기화하지 않은 값처럼 최적화에 따라 결과가 달라질 수 있는 실수는 남는다 [판단]. 배포하는 것은 Shipping 빌드이므로 그 빌드에서 직접 확인한다. T11은 자동화 테스트가 아니다. 테스트 모듈은 에디터 모듈이라 Shipping에 들어가지 않으므로 패키지의 실행 파일이 직접 돌린다.
+
 수동 확인: Shipping 빌드 3런 연속 크래시 0회, 에디터가 없는 PC에서 실행, 지인 2명의 첫 밤 플레이, 프레임 타임 측정(Test 구성, PC 사양과 장면 기록).
 
-### 9.2 골든 벡터 대전의 정의와 JS 산정값 (참고, 기준 아님)
+### 9.2 회귀 테스트 대전의 정의와 JS 산정값 (참고, 기준 아님)
 
-정의 (기획서 §10): 시드 1~20으로 기본 덱(분대 6개, 13명)의 무작위 배치를 만들고, 상대는 시드를 3으로 나눈 나머지 0·1·2에 따라 밤 3·7·12다.
+정의 (11/18 결정, 같은 날 보완): 대전 20건의 입력(양쪽 진형)을 `Source/RankTests/Fixtures/regression_inputs.csv`에 고정한다. 난수기로 만들지 않는다. 입력을 바꾸려면 본인의 승인을 받고, 바꾸면 결과도 다시 기록한다.
 
-11/17부터 이 대전의 기대값은 기준으로 확정된 RankCore가 기록한다. C++은 정수 난수기로 배치를 만들므로 배치 자체가 아래 표와 다르다. 아래 표는 기획 단계에 JS로 낸 [산정] 값으로, 기록으로만 남긴다.
+- 입력은 갈래 목록(`Source/RankTests/Fixtures/regression_branches.csv`)으로 고른다. 갈래는 `docs/rules.md`에서 처리가 나뉘는 곳이다. 목록에는 갈래마다 조항, 배치만 봐도 아는지, 맡는 테스트, 지날 대전, 확인 방법을 적는다. T1이 맡은 갈래는 대전 1건 이상이 지나야 한다. 수는 목록이 정하고, 지금은 20건으로 다 덮인다.
+- 대전은 두 가지를 섞는다. 실전 대전(rb10~rb20)은 실제 밤 진형(아래 밤 3·7·12)과 기본 덱 배치로 한다. 아군 배치는 아래 표(이전 정의)의 배치를 다시 쓰고, JS 결과는 쓰지 않는다. 작은 판(rb01~rb09)은 밤 진형으로는 나오지 않는 경계를 만들려고 직접 만든 것이다. 보완 전에는 "해골 쪽은 밤 3·7·12 진형을 쓴다"였다.
+- 절차: ① AI가 목록과 초안을 만들고 본인이 목록에 빠진 갈래가 없는지 확인한다. 초안이 보장하는 것은 배치만 봐도 아는 갈래뿐이다. ② RankCore 구현 뒤 첫 기록 전에 RankRegression이 대전마다 실제로 지난 갈래를 센다. T1이 맡은 갈래 가운데 0건이 있으면 입력을 고친다(승인). 이어서 변이 검사를 한다(9.5). ③ 기준 확정과 첫 기록.
+
+이전 정의(기획서 §10, 11/18 변경): 시드 1~20으로 기본 덱(분대 6개, 13명)의 무작위 배치를 만들고, 상대는 시드를 3으로 나눈 나머지 0·1·2에 따라 밤 3·7·12다. 아래 표는 이 정의로 기획 단계에 JS로 낸 [산정] 값으로, 기록으로만 남긴다.
 
 | 시드 | 상대 | 내 배치 (행 0/1/2/3) | 결과 | 틱 | 이벤트 | 해시 |
 |---|---|---|---|---|---|---|
@@ -568,17 +578,19 @@ T2~T5와 본인 리뷰가 판정 A의 기준이고, 통과하면 RankCore를 기
 | 파일 | 내용 | 만드는 쪽 | 쓰는 테스트 |
 |---|---|---|---|
 | `hand_v1.json` | 손계산 시나리오: id, 조항 번호, 양쪽 진형, 계산할 항목, 기대값, 틱별 계산 과정, 확인 상태 | 입력과 기대값은 AI, 확인은 본인 | T5 |
-| `golden_v1.json` | 9.2의 20건: 양쪽 진형, 결과, 틱, 이벤트 수, 해시. 기록한 커밋, 병과 수치와 규칙 매개변수의 해시 | `tools\record_golden.bat` (RankGolden 커맨들릿) | T1 |
+| `regression_branches.csv` | 9.2의 갈래 목록: id, 조항, 갈래, 배치만 봐도 아는지, 맡는 테스트, 지날 대전, 확인 방법 | 초안은 AI, 확인과 변경 승인은 본인 | T1 |
+| `regression_inputs.csv` | 9.2의 대전 20건의 입력: id, 아군 진형 4행, 해골 진형 4행 | 초안은 AI, 확인과 변경 승인은 본인 | T1, T11 |
+| `regression_battles_v1.json` | 대전 20건의 결과: 양쪽 진형, 결과, 틱, 이벤트 수, 해시, 성문 값, 생존 수, 체력 합, 로그 체크섬, 실제로 지난 갈래. 기록한 커밋, 기록에 쓴 병과 수치와 규칙 매개변수(값 그대로) | `tools\record_regression.bat` (RankRegression 커맨들릿) | T1, T11 |
 
 - T2, T3, T4의 무작위 배치는 시드를 고정한 정수 난수기로 그때그때 만든다. JS의 난수기와 배치 함수(실수 연산)는 옮기지 않는다.
-- 무작위 배치 방식(11/17 확정 · 본인): 분대 순서를 섞고 분대마다 회전과 위치를 40번까지 시도한다. 하나라도 못 놓으면 그 배치를 버리고 처음부터 다시 한다(최대 100번). 100번 안에 못 만들면 실패로 알린다. 기획 단계 JS는 못 놓은 분대를 빼고 넘어가서 1,000개 중 7개가 덱이 약해진 배치였다. 같은 함수와 난수기를 테스트, BalanceSim 탐색 봇, RankGolden이 함께 쓴다.
+- 무작위 배치 방식(11/17 확정 · 본인): 분대 순서를 섞고 분대마다 회전과 위치를 40번까지 시도한다. 하나라도 못 놓으면 그 배치를 버리고 처음부터 다시 한다(최대 100번). 100번 안에 못 만들면 실패로 알린다. 기획 단계 JS는 못 놓은 분대를 빼고 넘어가서 1,000개 중 7개가 덱이 약해진 배치였다. 같은 함수와 난수기를 T2~T4와 BalanceSim 탐색 봇이 함께 쓴다. 회귀 테스트(T1)는 고정 입력 파일을 쓴다.
 - AI는 `docs/rules.md`만 보고 계산한다. 구현 코드(C++, JS)를 보거나 실행해서 값을 얻지 않고, 구현을 맡은 세션과 다른 세션에서 계산하는 것을 권한다.
 - 확인 상태가 `확인 전`인 시나리오는 "본인 확인 전"으로 실패한다. 건너뛰지 않는다.
-- 골든 벡터는 기준 확정 뒤에만 기록하고, 다시 기록은 본인이 승인한 규칙·수치 변경이나 버그 수정 뒤에만 한다. 덮어쓰기 전에 바뀐 대전의 비교표를 본다.
+- 회귀 테스트 결과는 기준 확정 뒤에만 기록하고, 다시 기록은 본인이 승인한 규칙·수치 변경이나 버그 수정 뒤에만 한다. 덮어쓰기 전에 바뀐 대전의 비교표를 본다.
 
 ### 9.4 작성과 실행
 
-- 테스트는 `IMPLEMENT_SIMPLE_AUTOMATION_TEST(클래스 이름, "RankAndFile.Core.Golden", 플래그)`로 쓴다. `RunTest`가 true를 돌려주면 통과다. 플래그는 실행 컨텍스트와 필터(EngineFilter, ProductFilter 등)를 합쳐 준다([Epic: Write C++ Tests](https://dev.epicgames.com/documentation/en-us/unreal-engine/write-cplusplus-tests-in-unreal-engine)).
+- 테스트는 `IMPLEMENT_SIMPLE_AUTOMATION_TEST(클래스 이름, "RankAndFile.Core.Regression", 플래그)`로 쓴다. `RunTest`가 true를 돌려주면 통과다. 플래그는 실행 컨텍스트와 필터(EngineFilter, ProductFilter 등)를 합쳐 준다([Epic: Write C++ Tests](https://dev.epicgames.com/documentation/en-us/unreal-engine/write-cplusplus-tests-in-unreal-engine)).
 - 이름은 `RankAndFile.Core.*`, `RankAndFile.Content.*`, `RankAndFile.Run.*`로 나눈다. 한 줄 명령이 `RankAndFile` 전체를 돌린다.
 
 `tools/run_tests.bat` [제안]
@@ -602,10 +614,21 @@ T2~T5와 본인 리뷰가 판정 A의 기준이고, 통과하면 RankCore를 기
 3. 계산이 틀렸는지 코드가 틀렸는지 본인이 정한다. 규칙 문서가 모호해서 생긴 차이면 문서를 먼저 고친다 (기획서 §8).
 4. 원인을 찾기 전에는 화면 작업으로 넘어가지 않는다 (일정표).
 
-골든 벡터(T1)가 어긋나면 (기준 확정 뒤)
+회귀 테스트(T1)가 어긋나면 (기준 확정 뒤)
 1. 의도하지 않은 동작 변경이다. 바뀐 대전 중 이벤트 수가 가장 적은 것을 고른다.
 2. 기록 당시 커밋과 지금 커밋의 이벤트 로그를 나란히 놓고 처음 다른 틱을 찾는다.
 3. 승인한 변경 때문이면 비교표를 보고 다시 기록한다. 기대값을 손으로 고치지 않는다.
+
+변이 검사 (11/18, 기준 확정 전에 한 번)
+1. `docs/rules.md` §9에서 고르지 않은 선택지 8개(2, 3, 5, 7, 8, 12, 15, 16번)를 하나씩 RankCore에 넣은 임시 코드(변이)를 만든다. 11번과 13번은 피해 값과 이벤트 수로 늘 드러나므로 뺀다.
+2. 변이마다 T1(새 입력으로 기록한 결과와 비교)과 T5를 돌린다. 변이 하나에 하나 이상이 실패해야 한다.
+3. 모두 통과하는 변이가 있으면, 그 갈래를 지나는 대전이나 비교 항목을 더하자고 제안한다(승인).
+4. 변이 코드는 커밋하지 않고, 끝나면 되돌린다. 결과(변이별로 실패한 테스트)는 `docs/decisions.md`의 기준 확정 행에 적는다.
+
+Shipping 결정성(T11)이 어긋나면
+1. 빌드 구성에 따라 결과가 달라지는 결정론 버그다. 기록을 다시 하지 않는다.
+2. 어긋난 대전 가운데 이벤트 수가 가장 적은 것을 골라 에디터와 Shipping 패키지의 이벤트 로그를 나란히 놓고 처음 다른 틱을 찾는다.
+3. `Source/RankCore/AGENTS.md`의 결정론 점검표로 원인을 좁힌다. 고친 뒤 T1~T5와 T11을 다시 돌린다. 고친 결과 에디터의 결과까지 바뀌었으면 버그 수정이므로 비교표를 보고 승인을 받아 다시 기록한다.
 
 ## 10. AI 콘텐츠 파이프라인
 
@@ -650,8 +673,8 @@ flowchart LR
 
 | 모드 [제안] | 입력 | 출력 CSV의 열 |
 |---|---|---|
-| `card` | 후보 JSON, 기준 덱 묶음 | 후보 id, 넣은 승률, 뺀 승률, 기여도, 최고 두 장 조합 승률, 최대 유사도, 판정 |
-| `formation` | 진형 JSON, 배정된 밤 | 진형 id, 밤, 봇 승률, 목표, 차이, 판정 |
+| `card` | 후보 CSV, 기준 덱 묶음 | 후보 id, 넣은 승률, 뺀 승률, 기여도, 최고 두 장 조합 승률, 최대 유사도, 판정 |
+| `formation` | 진형 CSV, 배정된 밤 | 진형 id, 밤, 봇 승률, 목표, 차이, 판정 |
 | `class` | 병과 수치 | 병과, 단일 병과 덱 승률, 1명당 가치 |
 | `curve` | 채택본 전체 | 밤, 봇 승률, 목표, 차이, 런 클리어율 |
 
@@ -662,7 +685,7 @@ flowchart LR
 | 작업 | AI | 본인 | 완료 기준 |
 |---|---|---|---|
 | 전투 코어(C++) | `docs/rules.md`로 구현, 테스트 작성, 조항별 코드 대조표, 손계산 시나리오 계산(구현과 다른 세션) | 손계산 시나리오의 계산 과정 확인, 모듈 경계와 결정론 규칙 지정, 코드 리뷰, 기준 확정 | T2~T5 통과와 본인 확정 |
-| 콘텐츠 | 스키마에 맞춘 후보 JSON 생성 | 스키마, 설계 기둥, 최종 채택 | 관문 1~3 통과 |
+| 콘텐츠 | 스키마에 맞춘 후보 CSV 생성 | 스키마, 설계 기둥, 최종 채택 | 관문 1~3 통과 |
 | 밸런스 | BalanceSim 리포트 요약, 수치 조정안 | 채택 여부와 이유 기록 | 다시 돌린 시뮬레이션 통과 |
 | 에셋 조사 | GLB의 관절과 애니메이션 목록 | 병과·이벤트별 애니메이션 매핑 | 임포트 후 재생 확인 |
 | 교차 검토 | 별도 세션에 명세와 변경분만 주고 규칙 위반 찾기 | 지적의 채택과 기각 | 결정 기록에 남김 |
@@ -706,7 +729,7 @@ flowchart TD
 
 | 할 일 | 이유 |
 |---|---|
-| 병과 수치를 정한다(15절 1번) | 손계산 시나리오의 기대값이 이 수치로 계산된다. 나중에 바꾸면 시나리오를 다시 계산하고 골든 벡터를 다시 기록해야 한다 |
+| 병과 수치를 정한다(15절 1번) | 손계산 시나리오의 기대값이 이 수치로 계산된다. 나중에 바꾸면 시나리오를 다시 계산하고 회귀 테스트 결과를 다시 기록해야 한다 |
 | 전투 규칙 8조항과 6.3~6.5를 `docs/rules.md`로 옮기고 확정한다 | 11/17부터 구현과 검증의 유일한 기준이다 |
 | 손계산 시나리오를 만든다: AI가 규칙 문서로 계산하고 본인이 계산 과정을 확인 | C++ 결과를 보기 전에 기대값을 정해 둬야 결과에 끌려가지 않는다 |
 
@@ -719,7 +742,7 @@ flowchart TD
 1. 게임 저장소, `AGENTS.md`, 개발 일지 양식
 2. UE 5.8 C++ 프로젝트와 모듈 4개 뼈대. VS에서 빌드하고, 빈 Shipping 패키지를 한 번 만들어 실행한다. 캐릭터 GLB 2개(Knight, Skeleton_Minion)를 임포트해 Skeleton 공유와 애니메이션 재생을 확인한다(14.1절)
 3. `RankCore` 구현 순서(`docs/rules.md` 기준): 구조체와 데이터 → 링크 계산 → 유닛 생성 → 한 틱 처리 → 해시 → 판정 → 배치 판정
-4. 테스트 T2~T5, 본인 리뷰, 기준 확정, 골든 벡터 기록(T1)
+4. 테스트 T2~T5, 본인 리뷰, 기준 확정, 회귀 테스트 결과 기록(T1), Shipping 패키지에서 Shipping 결정성 확인(T11)
 5. 배경 에셋 AI 생성(1시간 제한): 바닥 1장, 원경 1장. 8.6절의 선별 기준으로 고른다. 판정 A가 먼저다
 6. 판정 A (밤): T5 전부, T2·T3 각 1,000/1,000, T4 10,000/10,000, 본인 리뷰 끝. 실패하면 9.5 절차
 
@@ -736,7 +759,7 @@ flowchart TD
 **11/18 (수): 한 런과 시뮬레이터**
 
 1. `URunSubsystem`과 런 루프: 12밤, 보상 3장 중 1장, 3패 종료, 결과 화면. 콘텐츠는 손으로 만든 임시 분대와 진형으로 채운다
-2. JSON 임포터와 T8
+2. CSV 임포터와 T8
 3. BalanceSim 커맨들릿, 처리량 측정
 4. 특성 조각과 유물 효과 구현, T7. **일정표에 없던 작업이다.** 11/19 콘텐츠 생성 전에 끝나야 한다(15절 3번)
 5. 전장 구성: AI 생성 바닥과 원경을 배치하고 조명을 맞춘다
@@ -749,7 +772,7 @@ flowchart TD
 
 **11/19 (목): AI 콘텐츠**
 
-1. 1차 후보 생성: 분대, 유물, 해골 진형 JSON
+1. 1차 후보 생성: 분대, 유물, 해골 진형 CSV
 2. 관문 1, 관문 2
 3. 탈락 사유를 붙여 2차 생성, 통과율 기록
 4. 통과한 후보를 직접 플레이해 채택(관문 3): 분대 24, 유물 12, 진형 36
@@ -786,7 +809,7 @@ flowchart TD
 5. 참조 시뮬레이터 웹 링크 공개
 6. 마지막 수단: 런을 12밤에서 8밤으로
 
-버리지 않는 것: 결정성·미러·골든 벡터 테스트, 완결된 런, 첫 밤 튜토리얼, Shipping 패키지, 플레이 영상, 개발 일지.
+버리지 않는 것: 결정성·미러·회귀 테스트, 완결된 런, 첫 밤 튜토리얼, Shipping 패키지, 플레이 영상, 개발 일지.
 
 ## 14. 빌드와 패키징
 
@@ -794,7 +817,7 @@ flowchart TD
 |---|---|
 | Development Editor | 개발, 자동화 테스트, BalanceSim |
 | Test | 프레임 타임 측정 (일정표) |
-| Shipping | 배포 패키지, 3런 크래시 확인, 클린 PC 실행 |
+| Shipping | 배포 패키지, 3런 크래시 확인, 클린 PC 실행, Shipping 결정성(T11) |
 
 - 패키징은 `Engine/Build/BatchFiles/RunUAT.bat`의 `BuildCookRun`으로 한다. 빌드, 쿠킹, 스테이징, 패키지 단계를 한 명령으로 돈다([Epic: Build Operations](https://dev.epicgames.com/documentation/en-us/unreal-engine/build-operations-cooking-packaging-deploying-and-running-projects-in-unreal-engine)).
 - 인자를 손으로 쓰면 틀리기 쉬우므로 에디터의 실행 프로필(Custom Launch Profile)이 만들어 주는 명령을 `tools/package.bat`에 그대로 옮긴다. 같은 문서가 권하는 방법이다.
@@ -810,9 +833,10 @@ flowchart TD
 | Unreal MCP (11/17) | 실험 기능. 본체는 기본으로 켜져 있고 도구 묶음 플러그인은 직접 켠다. 쿠킹한 Shipping 빌드도 MCP 서버를 띄울 수 있다([Epic: Unreal MCP](https://dev.epicgames.com/documentation/unreal-engine/unreal-mcp-in-unreal-editor)). 결정: 도구 묶음만 플러그인 금지의 예외로 켜고, Shipping에서는 뺀다. [미확인] 빼는 설정 위치(플러그인 대상 설정 또는 서버 자동 시작) | 도구 묶음을 켠 뒤 빈 Shipping 패키지 실행. 그 패키지에서 `127.0.0.1:8000`에 서버가 뜨지 않는지 확인 |
 | 렌더링 | 5.8 문서 기준으로 Lumen은 DX12·SM6와 RTX 2000급 이상, Nanite와 가상 그림자는 SM6.6이 필요하다([Epic: 하드웨어 사양 5.8](https://dev.epicgames.com/documentation/unreal-engine/hardware-and-software-specifications-for-unreal-engine?application_version=5.8)) | 프로젝트에서 셋 다 끈다(`docs/background.md` 2.4절) |
 | 에셋 | KayKit GLB는 glTF 2.0, 정점당 본 영향 최대 4개라 5.8 glTF 임포터의 영향 수 제한 문제([포럼](https://forums.unrealengine.com/t/interchange-gltf-importer-truncates-skeletal-mesh-bone-influences-to-4-per-vertex/2745391))와 무관하다(8.6절) | GLB 2개 임포트, Skeleton 공유, 애니메이션 재생 |
+| Shipping 결정성 (11/18) | T11은 Shipping 실행 파일이 실행 인자와 입력 파일을 읽고 결과 파일을 써야 한다. [미확인] Shipping에서 실행 인자 처리, 파일을 쓸 수 있는 위치, 로그가 꺼지는지, 종료 코드를 돌려주는 방법 | 엔진 소스에서 확인하고 빈 Shipping 패키지에서 시험 |
 | AI 코딩 도구 | [판단] 5.8 출시 이후 변경을 모르고 이전 API를 제안할 수 있다 | 컴파일 오류로 드러난다. 엔진 소스와 문서로 확인한다 |
 
-세 확인(빌드, Shipping 패키지, GLB 임포트)이 2시간 안에 끝나지 않으면 17절의 대응대로 5.6으로 돌아간다 [제안].
+~~세 확인(빌드, Shipping 패키지, GLB 임포트)이 2시간 안에 끝나지 않으면 17절의 대응대로 5.6으로 돌아간다 [제안].~~ **11/17 폐기**: 5.8 확정. 5.6으로 돌아가지 않는다(`docs/decisions.md`).
 
 Shipping에서만 깨지기 쉬운 곳 [판단]
 - DataTable 에셋이 쿠킹에 들어가는지. 코드가 경로 문자열로만 참조하면 빠질 수 있다. 11/18 첫 12밤 완주에서 확인한다.
@@ -841,7 +865,8 @@ Shipping에서만 깨지기 쉬운 곳 [판단]
 | 항목 | 기준 | 결과 | 기록일 |
 |---|---|---|---|
 | 손계산 시나리오 | 전부 일치 (개수) | | 11/17 |
-| 골든 벡터 | 기준 확정 커밋, 20/20 | | 11/17 |
+| 회귀 테스트 | 기준 확정 커밋, 20/20 | | 11/17 |
+| Shipping 결정성 | Shipping 패키지, 20/20 | | 기준 확정 뒤 |
 | 결정성, 미러 | 각 1,000판 | | 11/16 |
 | 배치 판정 등가성 | 비트마스크 = 칸 단위, 1만 건 | | 11/16 |
 | BalanceSim 처리량 | 판/초 | | 11/18 |
@@ -864,11 +889,11 @@ Shipping에서만 깨지기 쉬운 곳 [판단]
 | 배치 조작이 불편하다 | 한 밤 배치에 1분 이상 | 클릭 배치, 우클릭·휠 회전, 직전 배치 불러오기 (기획서 §8) |
 | 자동 전투가 지루하다 | 플레이테스트에서 건너뛰기만 누른다 | 링크 발동 연출, 열별 결과 요약 (기획서 §8) |
 | 밸런스가 곡선에 맞지 않는다 | 11/19 저녁에 10밤 미만 통과 | 허용 폭 ±8%p, 진형 수 축소, 특성 수치 하향 (기획서 §8) |
-| 병과 수치를 늦게 바꾼다 | 기준 확정 뒤 수치 변경 | 수치는 데이터이므로 코드는 그대로다. 손계산 시나리오를 AI가 다시 계산하고 본인이 확인하고, 골든 벡터를 승인 후 다시 기록하고, 문서 수치를 BalanceSim으로 다시 잰다 |
+| 병과 수치를 늦게 바꾼다 | 기준 확정 뒤 수치 변경 | 수치는 데이터이므로 코드는 그대로다. 손계산 시나리오를 AI가 다시 계산하고 본인이 확인하고, 회귀 테스트 결과를 승인 후 다시 기록하고, 문서 수치를 BalanceSim으로 다시 잰다 |
 | 11/18에 일이 몰린다 | 오후까지 런 루프가 안 돈다 | 특성 조각 수를 줄이고 전장 구성을 11/19로 옮긴다 |
 | AI 배경이 유닛과 안 어울리거나 진형이 안 읽힌다 | 11/16 선별 기준 2번에서 탈락이 반복된다 | 1시간 제한을 넘기지 않는다. KayKit 조각 조립으로 되돌린다 (8.6절) |
 | 패키징이 깨진다 | Shipping 빌드 실패 | 11/16에 빈 패키지, 11/18부터 매일 Shipping 빌드, 플러그인 최소화 (기획서 §8) |
-| 5.8 개발 도구나 패키징에서 막힌다 | 11/16 14.1절 확인이 2시간 넘게 안 끝난다 | [제안] 5.6으로 돌아간다. 전투 코어는 엔진과 분리돼 있어 코드 손실은 없다 |
+| 5.8 개발 도구나 패키징에서 막힌다 | 11/16 14.1절 확인이 2시간 넘게 안 끝난다 | ~~[제안] 5.6으로 돌아간다. 전투 코어는 엔진과 분리돼 있어 코드 손실은 없다~~ **11/17 폐기**: 5.8 확정. 5.6으로 돌아가지 않는다(`docs/decisions.md`) |
 
 ## 출처
 
@@ -884,5 +909,6 @@ Shipping에서만 깨지기 쉬운 곳 [판단]
 - [Epic: Interchange Import Reference in Unreal Engine](https://dev.epicgames.com/documentation/unreal-engine/interchange-import-reference-in-unreal-engine)
 - [Epic: Importing Skeletal Meshes Using FBX in Unreal Engine](https://dev.epicgames.com/documentation/en-us/unreal-engine/importing-skeletal-meshes-using-fbx-in-unreal-engine)
 - [Epic: Build Operations (Cooking, Packaging, Deploying, Running)](https://dev.epicgames.com/documentation/en-us/unreal-engine/build-operations-cooking-packaging-deploying-and-running-projects-in-unreal-engine)
+- [Gaffer on Games: Floating Point Determinism](https://gafferongames.com/post/floating_point_determinism/)
 
 Epic 문서는 대부분 5.x 공통 페이지이고, 5.8 전용으로 확인한 것은 14.1절의 하드웨어 사양과 릴리스 노트뿐이다. 엔진에서 동작이 다르면 엔진을 따른다.
