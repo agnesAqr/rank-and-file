@@ -10,6 +10,7 @@
 | `run_sim.bat` | BalanceSim | `tools\run_sim.bat` |
 | `package.bat` | Shipping 패키지 | `tools\package.bat` |
 | `check_shipping_determinism.bat` | Shipping 패키지로 회귀 테스트 입력 20건을 돌려 기록과 비교한다(T11) | `tools\check_shipping_determinism.bat` |
+| `hand_crosscheck.js` | 손계산 시나리오 교차 검증: 눈가림 입력 만들기, 검증자 결과의 형식 검사, 기대값과 비교, 확인 상태 적기 | `node tools/hand_crosscheck.js <export\|validate\|compare\|apply>` |
 
 JS 참조 구현은 이 폴더에 두지 않는다. 이 저장소의 기준이 아니다(루트 1절).
 
@@ -39,6 +40,14 @@ JS 참조 구현은 이 폴더에 두지 않는다. 이 저장소의 기준이 �
 - 비교만 한다. 기록 파일을 만들거나 고치지 않는다.
 - 보고에는 패키지를 만든 커밋과 빌드 구성(Shipping)을 적는다.
 - [미확인] Shipping 실행 파일이 실행 인자를 읽는 방법, 결과 파일을 쓸 수 있는 위치, Shipping에서 로그가 꺼지는지, 끝날 때 종료 코드를 돌려주는 방법. 엔진 소스로 확인하고(`docs/design.md` 14.1절), 확인되면 이 표시를 지운다. 확인하기 전에 추측으로 짜지 않는다.
+
+## hand_crosscheck.js
+
+- `export`: `hand_v1.json`에서 병과 수치, 규칙 매개변수, 양쪽 진형만 뽑아 `docs/crosscheck/hand_v1/inputs.json`을 만든다. 기대값, 계산 과정, 목적, 조항 번호, 갈래는 옮기지 않는다. 같은 입력이면 같은 파일이 나온다. `--check`는 지금 파일이 최신인지만 본다.
+- `validate`: 검증자 결과 파일의 형식만 본다. `hand_v1.json`을 읽지 않는다. 검증자가 실행해도 되는 하위 명령은 이것뿐이다.
+- `compare`: 표준 출력에는 개수, 시나리오 id, 어긋난 항목 이름만 낸다. 값은 `--report`가 쓰는 사람용 보고서(`report.md`)에만 적는다. 전부 일치하고 모호 표시와 허용 목록 밖 파일이 없을 때만 종료 코드 0이다. 결과 파일의 `inputsId`가 지금의 `hand_v1.json`, `docs/rules.md`와 다르면 비교하지 않는다.
+- `apply`: 비교한 항목이 전부 일치하고 지금 `확인 전`인 시나리오의 확인 상태만 `교차 확인(모델, 날짜)`로 바꾼다. 파일의 다른 글자는 건드리지 않는다. 바꾼 뒤 다시 읽어 확인 상태 말고 달라진 것이 있으면 쓰지 않는다. 허용 목록 밖 파일이 있는 실행에는 적지 않는다.
+- 전투 규칙을 해석하는 코드를 넣지 않는다. 형식 검사와 값 비교만 한다. 내장 모듈만 쓴다.
 
 ## 실행 스크립트 공통
 
