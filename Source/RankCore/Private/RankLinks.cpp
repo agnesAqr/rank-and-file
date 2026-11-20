@@ -13,20 +13,6 @@ namespace Rank
 			return Formation.Cells[Row][Col];
 		}
 
-		// §3.4 a: 그 종류를 주는 병과의 한 겹 크기. 지금 데이터는 종류마다 주는 병과가 하나뿐이다.
-		// 둘 이상인 데이터는 Simulate가 입력 오류로 막는다(RankSimulate.cpp ValidateInput).
-		int32 GiverAmount(const FUnitDef* Defs, int32 NumDefs, ELinkStat Stat)
-		{
-			for (int32 Index = 0; Index < NumDefs; ++Index)
-			{
-				if (Defs[Index].LinkStat == Stat)
-				{
-					return Defs[Index].LinkAmount;
-				}
-			}
-			return 0;
-		}
-
 		int32 Min32(int32 A, int32 B) { return A < B ? A : B; }
 		int32 Max32(int32 A, int32 B) { return A > B ? A : B; }
 	}
@@ -58,8 +44,8 @@ namespace Rank
 
 		// §2.2, §3.3 위·아래·왼쪽·오른쪽 이웃만 본다. 대각선은 맞닿은 것이 아니다.
 		// 링크는 병과만 보고 정한다. 진영은 보지 않는다(§9 15번).
-		const int32 Offsets[4][2] = { { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 } };
-		for (int32 Index = 0; Index < 4; ++Index)
+		const int32 Offsets[MaxLinkNeighbors][2] = { { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 } };
+		for (int32 Index = 0; Index < MaxLinkNeighbors; ++Index)
 		{
 			const uint8 Neighbor = CellAt(Formation, Row + Offsets[Index][0], Col + Offsets[Index][1]);
 			if (Neighbor == 0 || Neighbor == Self)
@@ -72,6 +58,25 @@ namespace Rank
 				continue; // §2.8 해골처럼 링크 효과가 없는 병과는 주지 않는다
 			}
 			++Stacks.Count[static_cast<int32>(NeighborDef->LinkStat)];
+
+			// §3.4 겹은 주는 병과마다 따로 센다. 이웃은 넷뿐이라 NumGivers는 MaxLinkNeighbors를 넘지 않는다.
+			int32 GiverIndex = 0;
+			for (; GiverIndex < Stacks.NumGivers; ++GiverIndex)
+			{
+				if (Stacks.Givers[GiverIndex].Key == Neighbor)
+				{
+					break;
+				}
+			}
+			if (GiverIndex == Stacks.NumGivers)
+			{
+				FLinkGiver& NewGiver = Stacks.Givers[Stacks.NumGivers];
+				NewGiver.Key = Neighbor;
+				NewGiver.Stat = NeighborDef->LinkStat;
+				NewGiver.Amount = NeighborDef->LinkAmount;
+				++Stacks.NumGivers;
+			}
+			++Stacks.Givers[GiverIndex].Count;
 		}
 		return Stacks;
 	}
@@ -87,9 +92,17 @@ namespace Rank
 		const FLinkStacks Stacks = ComputeLinks(Formation, Row, Col, Defs, NumDefs);
 		auto Bonus = [&](ELinkStat Stat) -> int32
 		{
-			// §3.4 a × min(n, 겹 상한)
-			const int32 Count = Min32(Stacks.Count[static_cast<int32>(Stat)], Rules.LinkStackMax);
-			return Count == 0 ? 0 : GiverAmount(Defs, NumDefs, Stat) * Count;
+			// §3.4 주는 병과마다 a × min(n, 겹 상한)을 구해 더한다. 사거리 상한과 간격 하한은 아래에서 더한 뒤에 적용한다.
+			int32 Sum = 0;
+			for (int32 Index = 0; Index < Stacks.NumGivers; ++Index)
+			{
+				const FLinkGiver& Giver = Stacks.Givers[Index];
+				if (Giver.Stat == Stat)
+				{
+					Sum += Giver.Amount * Min32(Giver.Count, Rules.LinkStackMax);
+				}
+			}
+			return Sum;
 		};
 
 		OutStats.Armor = Def->Armor + Bonus(ELinkStat::Armor);

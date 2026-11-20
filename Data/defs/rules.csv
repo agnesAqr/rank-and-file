@@ -1,2 +1,2 @@
-cols,rows,maxTicks,gateHp,gateDamage,linkStackMax,rangeMax,intervalMin
-6,4,600,60,1,3,4,4
+maxTicks,gateHp,gateDamage,linkStackMax,rangeMax,intervalMin
+600,60,1,3,4,4

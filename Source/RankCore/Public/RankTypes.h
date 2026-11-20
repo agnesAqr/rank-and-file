@@ -7,6 +7,7 @@
 namespace Rank
 {
 	// §1 진형판은 진영마다 6열 × 4행이다. §3.2 유닛 번호 식이 이 크기에 묶여 있어 데이터가 아니라 규칙이 고정한 값이다.
+	// rules.csv에 두지 않는다(2026-11-20 결정, rules.md §9 18번).
 	inline constexpr int32 BoardCols = 6;
 	inline constexpr int32 BoardRows = 4;
 	inline constexpr int32 NumSides = 2;
@@ -75,10 +76,9 @@ namespace Rank
 	};
 
 	// §7 규칙 매개변수. 값은 Data/defs/rules.csv에서 온다. 코드에 기본값을 두지 않는다.
+	// 진형판 크기는 매개변수가 아니다(위 BoardCols, BoardRows).
 	struct FRuleParams
 	{
-		int32 Cols = 0;
-		int32 Rows = 0;
 		int32 MaxTicks = 0;
 		int32 GateHp = 0;
 		int32 GateDamage = 0;
@@ -123,10 +123,25 @@ namespace Rank
 		TArray<FBattleEvent> Log;     // bRecordLog가 true일 때만 채운다
 	};
 
-	// §3.3 종류별로 받은 겹 수. 인덱스는 ELinkStat이다.
+	// §2.2 이웃은 위·아래·왼쪽·오른쪽 넷이다. 그래서 한 칸에 링크를 주는 병과도 넷을 넘지 않는다.
+	inline constexpr int32 MaxLinkNeighbors = 4;
+
+	// §3.3 링크를 주는 병과 하나에게서 받은 겹
+	struct FLinkGiver
+	{
+		uint8 Key = 0;                     // 주는 병과의 키
+		ELinkStat Stat = ELinkStat::None;  // 주는 종류
+		int32 Amount = 0;                  // 한 겹의 크기(§7 linkAmount)
+		int32 Count = 0;                   // 이 병과에게서 받은 겹 수. 겹 상한 적용 전
+	};
+
+	// §3.3 받은 겹. Count는 종류별 합계(인덱스는 ELinkStat, 겹 상한 적용 전)이고,
+	// Givers는 주는 병과별 겹이다. §3.4는 병과마다 따로 센다. 이웃을 본 순서(위, 아래, 왼쪽, 오른쪽)로 처음 만난 병과부터 채운다.
 	struct FLinkStacks
 	{
 		int32 Count[static_cast<int32>(ELinkStat::Count)] = {};
+		FLinkGiver Givers[MaxLinkNeighbors] = {};
+		int32 NumGivers = 0;
 	};
 
 	// §3.4 링크를 더한 최종 능력치

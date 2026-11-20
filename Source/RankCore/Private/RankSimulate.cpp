@@ -57,28 +57,13 @@ namespace Rank
 			return false;
 		}
 
-		// §3.6 시작 조건. 아래 두 경우는 rules.md에 없어 사람의 결정을 기다린다 [미정].
-		// (1) rules.csv의 열·행이 §1의 6·4와 다를 때 (2) 같은 링크 종류를 두 병과 이상이 줄 때(§3.4 마지막 문단)
-		// 정해지기 전까지는 계산을 멈추도록 입력 오류로 막는다.
+		// §3.6 시작 조건. 진형판 크기는 규칙 상수(BoardCols, BoardRows)라 입력으로 받지 않는다(§7, §9 18번).
+		// 같은 링크 종류를 두 병과 이상이 주는 데이터도 받는다. 겹은 병과마다 따로 센다(§3.4, §9 17번).
 		bool ValidateInput(const FBattleInput& Input)
 		{
 			if (Input.Defs == nullptr || Input.NumDefs <= 0)
 			{
 				return false;
-			}
-			if (Input.Rules.Cols != BoardCols || Input.Rules.Rows != BoardRows)
-			{
-				return false; // [미정] (1)
-			}
-			for (int32 First = 0; First < Input.NumDefs; ++First)
-			{
-				for (int32 Second = First + 1; Second < Input.NumDefs; ++Second)
-				{
-					if (Input.Defs[First].LinkStat != ELinkStat::None && Input.Defs[First].LinkStat == Input.Defs[Second].LinkStat)
-					{
-						return false; // [미정] (2)
-					}
-				}
 			}
 			for (int32 Side = 0; Side < NumSides; ++Side)
 			{
