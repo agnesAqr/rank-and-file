@@ -42,6 +42,14 @@ namespace Rank
 			return Stacks;
 		}
 
+		// §2.8, §3.3 링크 효과가 없는 병과(해골)는 링크를 주지도 받지도 않는다. 받는 쪽도 여기서 거른다.
+		// 병과 수치에 없는 키도 받지 않는다. 그런 입력은 Simulate가 Invalid로 막는다(§3.6).
+		const FUnitDef* SelfDef = FindDef(Defs, NumDefs, Self);
+		if (SelfDef == nullptr || SelfDef->LinkStat == ELinkStat::None)
+		{
+			return Stacks;
+		}
+
 		// §2.2, §3.3 위·아래·왼쪽·오른쪽 이웃만 본다. 대각선은 맞닿은 것이 아니다.
 		// 링크는 병과만 보고 정한다. 진영은 보지 않는다(§9 15번).
 		const int32 Offsets[MaxLinkNeighbors][2] = { { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 } };

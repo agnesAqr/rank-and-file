@@ -7,7 +7,7 @@ namespace Rank
 	// 병과 키로 병과 수치를 찾는다. 없으면 nullptr.
 	RANKCORE_API const FUnitDef* FindDef(const FUnitDef* Defs, int32 NumDefs, uint8 Key);
 
-	// §3.3 (Row, Col) 칸의 병사가 받는 링크 겹 수. 빈칸이면 모두 0이다.
+	// §3.3 (Row, Col) 칸의 병사가 받는 링크 겹 수. 빈칸이거나, 그 칸의 병과가 링크 효과가 없거나(§2.8 해골) 병과 수치에 없으면 모두 0이다.
 	// 배치 화면의 링크 표시도 이 함수를 쓴다(Source/RankGame/AGENTS.md).
 	RANKCORE_API FLinkStacks ComputeLinks(const FFormation& Formation, int32 Row, int32 Col, const FUnitDef* Defs, int32 NumDefs);
 
