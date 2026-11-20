@@ -111,6 +111,17 @@ namespace Rank
 		int32 Value = 0;
 	};
 
+	// 한 판에 나올 수 있는 유닛 수의 상한: 진영 둘 × 칸 24
+	inline constexpr int32 MaxUnits = NumSides * BoardRows * BoardCols;
+
+	// §5.1 유닛 하나의 끝 상태
+	struct FUnitResult
+	{
+		int32 Id = 0;         // §3.2 유닛 번호
+		int32 Hp = 0;         // 끝났을 때 체력. 쓰러진 유닛은 쓰러진 틱의 피해까지 뺀 값이라 음수일 수 있다(§4.1 ③, §5.1)
+		bool bAlive = false;  // 끝났을 때 대열에 남아 있으면 true
+	};
+
 	struct FBattleResult
 	{
 		EOutcome Outcome = EOutcome::Invalid;
@@ -119,7 +130,9 @@ namespace Rank
 		int32 NumEvents = 0;          // §6 종류 1~4인 이벤트의 수
 		int32 Gate[NumSides] = {};    // [0] 플레이어 성문, [1] 해골 결계. 음수일 수 있다(§4.1 ③)
 		int32 Alive[NumSides] = {};
-		int32 HpSum[NumSides] = {};
+		int32 HpSum[NumSides] = {};   // 살아남은 유닛의 체력 합
+		FUnitResult Units[MaxUnits] = {}; // 모든 유닛의 끝 상태. 생성 순서(§3.1)다. 앞의 NumUnits개만 쓴다
+		int32 NumUnits = 0;           // Invalid면 0
 		TArray<FBattleEvent> Log;     // bRecordLog가 true일 때만 채운다
 	};
 

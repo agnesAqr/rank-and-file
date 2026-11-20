@@ -431,6 +431,16 @@ namespace Rank
 		Result.Outcome = Outcome;
 		Result.Tick = EndTick;
 		Result.Hash = Hash;
+
+		// §5.1 유닛마다 끝 상태를 적는다. 순서는 생성 순서(§3.1)이고, 대열에 남은 유닛만 살아 있다.
+		Result.NumUnits = State.Units.Num();
+		for (int32 Index = 0; Index < State.Units.Num(); ++Index)
+		{
+			Result.Units[Index].Id = State.Units[Index].Id;
+			Result.Units[Index].Hp = State.Units[Index].Hp;
+			Result.Units[Index].bAlive = false;
+		}
+
 		for (int32 Side = 0; Side < NumSides; ++Side)
 		{
 			Result.Gate[Side] = State.Gate[Side];
@@ -441,6 +451,7 @@ namespace Rank
 				for (int32 Rank = 0; Rank < Line.Num(); ++Rank)
 				{
 					Result.HpSum[Side] += State.Units[Line[Rank]].Hp;
+					Result.Units[Line[Rank]].bAlive = true;
 				}
 			}
 		}
