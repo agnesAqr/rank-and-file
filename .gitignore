@@ -35,6 +35,7 @@
 *.xcodeproj
 *.xcworkspace
 *.sln
+*.slnx
 *.suo
 *.opensdf
 *.sdf
@@ -45,6 +46,9 @@
 # Precompiled Assets
 SourceArt/**/*.png
 SourceArt/**/*.tga
+
+# KayKit 원본(CC0, GLB와 LICENSE). 커밋하지 않는다. 출처 주소, 커밋, SHA-256은 docs/decisions.md(2026-11-20)와 README 크레딧에 적는다
+SourceArt/KayKit/
 
 # Binary Files
 Binaries/*
