@@ -344,6 +344,7 @@ rl_dawn_bell,새벽의 종,Rule,MaxTicks,-50
 2. `RankEditor`의 임포터가 `Data/accepted/*.csv`를 DataTable 에셋으로 바꾼다. [미확인] `UDataTable::CreateTableFromCSVString`(5.8 엔진 소스로 확인)을 쓴다. DataTable 임포트 함수는 행 구조체가 먼저 정의돼 있어야 하고, 문제 메시지 목록을 돌려준다([Epic API: UDataTable](https://dev.epicgames.com/documentation/en-us/unreal-engine/API/Runtime/Engine/UDataTable)). 메시지가 하나라도 있으면 임포트를 실패로 처리한다.
 3. 분대 모양은 `0:0;1:0;1:1` 같은 문자열 한 칸이다. 칸 목록으로 바꾸는 일은 `RankGame`의 변환 함수가 맡는다(11/18 CSV로 바꾸며 "배열 안의 배열" 문제가 없어졌다).
 4. 콘텐츠 버전 해시: 채택본 CSV 3개와 `defs` CSV 2개의 내용을, BOM을 빼고 줄바꿈을 LF로 맞춘 뒤 FNV-1a로 묶은 값을 빌드에 넣고 결과 화면과 README에 적는다 (기획서 §5). 어느 콘텐츠로 잰 수치인지 구분하는 데 쓴다.
+5. 입력 오류를 읽을 때 막는다(11/20 결정, `docs/rules.md` §3.6): `formations.csv`를 읽을 때 병과 수치(`defs/units.csv`)에 없는 병과 키가 있거나 병사가 한 명도 없는 진형은 읽기 실패로 처리한다. 이 검사는 `formations.csv`를 읽는 쪽(아직 없다)에 두고 `RankContent::ParseFormationRows`에는 두지 않는다. 손계산 시나리오가 그 함수로 모르는 병과 키를 읽어 코어의 §3.6을 확인하기 때문이다.
 
 ## 8. RankGame 상세
 
@@ -364,6 +365,8 @@ stateDiagram-v2
 - 한 밤은 보상 → 배치 → 전투 → 결과다. 보상은 분대나 유물 3장 중 1장이고, 섬멸로 이긴 다음 밤에는 다시 뽑기를 1번 준다 (기획서 §3).
 - 4·8번째 밤은 정예, 12번째 밤은 우두머리다. 패배가 3번 쌓이면 런이 끝난다 (기획서 §3).
 - [미정] 시작 덱과 밤별 기대 덱 크기가 기획서에 없다(15절 2번).
+- 입력 오류(`docs/rules.md` §3.6)는 판정하지 않으므로(§5.2) 패배로 세지 않는다(11/20 결정). `Rank::Judge`의 `bJudged`가 false면 `bWin`을 보지 않는다. 아군 진형판이 비는 경우는 배치 화면이 막고(8.3절), 모르는 병과 키와 빈 해골 진형은 `formations.csv`를 읽을 때 막는다(7.3절).
+- 그래도 런 중에 해골 진형판이 비어 있으면 그 밤의 다른 진형으로 바꿔 다시 시작한다. 2번 바꿔도 안 되면 오류를 UI로 알리고 게임을 끝낸다(11/20 결정). 밤마다 진형이 3개라 2번까지 바꿀 수 있다.
 
 `URunSubsystem` [제안]: `UGameInstanceSubsystem`으로 만든다. 게임 인스턴스와 수명이 같고 인스턴스가 초기화될 때 `Initialize()`가 불린다([Epic: Programming Subsystems](https://dev.epicgames.com/documentation/en-us/unreal-engine/programming-subsystems-in-unreal-engine)). 레벨을 바꿔도 런 상태가 남는다.
 
@@ -408,6 +411,7 @@ stateDiagram-v2
 - 6×4 진형판, 분대 드래그, 회전(R), 링크 표시 (일정표 11/17).
 - 놓을 수 있는지는 `FFormationMask::CanPlace`, 링크와 최종 능력치 미리보기는 `Rank::ComputeLinks`로 계산한다.
 - 병사를 한 명도 놓지 않으면 전투 시작 버튼을 누를 수 없게 한다(11/18, `docs/rules.md` §3.6). 분대는 돌리기만 하고 뒤집지 않는다(§2.1).
+- 아군 진형판이 빈 채로 전투를 시작하려 하면 경고 UI로 알리고 전투를 시작하지 않는다. 패배로 세지 않는다(11/20 결정).
 - [제안] 입력은 격자 위젯에서 받는다. 동작은 C++, 배치와 모양은 에디터에서 조정한다. 조작이 웹 참조 시뮬레이터와 같고, 화면 좌표를 칸으로 바꾸는 코드가 한 곳에 모인다. 3D 전장에는 놓인 결과만 보여 준다(15절 5번).
 - 판정 B에서 드래그가 안 되면 클릭 배치로 줄인다 (일정표).
 - 배치에 1분 넘게 걸리면 우클릭·휠 회전과 직전 배치 불러오기를 넣는다 (기획서 §8).
@@ -533,6 +537,14 @@ JS 참조 구현도 AI가 작성했고 본인이 검증하지 않았으므로 �
 | T9 | 런 스모크 [제안] | 탐색 봇이 시드 10개로 런을 끝까지 돈다. 같은 시드를 두 번 | 멈춤과 크래시 0, 같은 시드는 같은 결과 | 11/18 |
 | T10 | 재생 일치 [제안] | 재생이 끝난 화면 상태와 `FBattleResult` 비교 | 일치 | 11/17 |
 | T11 | Shipping 결정성 | 고정 입력(`regression_inputs.csv`) 20건을 Shipping 패키지에서 돌려, 에디터에서 기록한 T1의 결과와 비교한다. `tools\check_shipping_determinism.bat` | T1과 같은 항목이 20/20 일치 | 기준 확정 직후 |
+
+보조 테스트: 결정이나 조항 하나를 지키는 작은 검사다. 번호를 붙이지 않고 이름으로 부른다. `tools\run_tests.bat`이 함께 돌린다.
+
+| 이름 | 테스트 | 기대값의 출처 | 통과 기준 | 넣는 날 |
+|---|---|---|---|---|
+| `RankAndFile.Core.Judge_InvalidIsNotJudged` | 입력 오류(§3.6)는 `Rank::Judge`가 판정하지 않고, A·B·Draw·Timeout은 판정한다 | `docs/rules.md` §5.2 | 입력 오류 4/4, 판정 20/20 | 11/21 |
+| `RankAndFile.Core.Placement_RejectsBadCellCount` | 칸 수가 −1, 0, 5인 모양은 비트마스크 판정과 칸 단위 판정 모두 놓을 수 없다. 1~4칸은 놓을 수 있다 | §2.1, 2026-11-20 결정(조항 대조표 7번) | 72/72, 4/4 | 11/21 |
+| `RankAndFile.Content.Defs_RejectsBadValues` | `maxTicks`나 `gateHp`가 0 이하이거나 병과 키가 겹치는 CSV는 읽기 실패다. 지금 `Data/defs`는 읽힌다 | 2026-11-20 결정(조항 대조표 6번) | 5/5 | 11/21 |
 
 T2~T5와 본인 리뷰가 판정 A의 기준이고, 통과하면 RankCore를 기준으로 확정해 T1을 기록한다(9.0절). T1~T5는 화면 없이 돈다. T6(JS와 승률 비교)은 11/17에 없앴다.
 

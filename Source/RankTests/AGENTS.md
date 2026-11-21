@@ -17,6 +17,14 @@
 | T10 | 재생 일치: 재생이 끝난 화면 상태와 `FBattleResult` 비교 | `FBattleResult` | 일치 |
 | T11 | Shipping 결정성: `Fixtures/regression_inputs.csv`의 대전 20건을 Shipping 패키지에서 돌려 T1의 기록과 비교한다. 빌드 구성이 달라도 결과가 같은지 본다 | T1과 같은 기록(`Fixtures/regression_battles_v1.json`, 에디터에서 기록) | T1과 같은 항목이 20/20 일치 |
 
+보조 테스트: 결정이나 조항 하나를 지키는 작은 검사다. 번호를 붙이지 않고 이름으로 부른다. `tools\run_tests.bat`이 함께 돌린다.
+
+| 이름 | 테스트 | 기대값의 출처 | 통과 기준 |
+|---|---|---|---|
+| `RankAndFile.Core.Judge_InvalidIsNotJudged` | 입력 오류(§3.6)는 `Rank::Judge`가 판정하지 않고, A·B·Draw·Timeout은 판정한다 | `docs/rules.md` §5.2 | 입력 오류 4/4, 판정 20/20 |
+| `RankAndFile.Core.Placement_RejectsBadCellCount` | 칸 수가 −1, 0, 5인 모양은 비트마스크 판정과 칸 단위 판정 모두 놓을 수 없다. 1~4칸은 놓을 수 있다 | §2.1, 2026-11-20 결정(조항 대조표 7번) | 72/72, 4/4 |
+| `RankAndFile.Content.Defs_RejectsBadValues` | `maxTicks`나 `gateHp`가 0 이하이거나 병과 키가 겹치는 CSV는 읽기 실패다. 지금 `Data/defs`는 읽힌다 | 2026-11-20 결정(조항 대조표 6번) | 5/5 |
+
 - T6(JS 참조 구현과 승률 비교)은 2026-11-17에 없앴다. 번호는 다시 쓰지 않는다.
 - 이름은 `RankAndFile.Core.*`, `RankAndFile.Content.*`, `RankAndFile.Run.*`로 나눈다. `tools\run_tests.bat`이 `RankAndFile` 전체를 돌린다.
 - `IMPLEMENT_SIMPLE_AUTOMATION_TEST`로 쓴다. T1~T5는 화면 없이 돈다.
