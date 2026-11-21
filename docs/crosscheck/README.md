@@ -72,7 +72,7 @@ docs/crosscheck/
 ## 보고 형식
 
 ```
-T5 교차 검증: 일치 <수>/18 · 불일치 <수>(<id>) · 모호 표시 <수>(<id>) · 허용 목록 밖 파일 <수>
+T5 교차 검증: 일치 <수>/<전체> · 불일치 <수>(<id>) · 모호 표시 <수>(<id>) · 허용 목록 밖 파일 <수>
 검증자: Antigravity · <모델> · <날짜> · 방법 <manual 또는 program> · inputsId <값>
 명령: node tools/hand_crosscheck.js compare docs/crosscheck/hand_v1/run1/result.json --report
 ```
