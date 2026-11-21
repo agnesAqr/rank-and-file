@@ -3,7 +3,7 @@
 사람이 `Source/RankCore`를 기준으로 확정하기 전에 `docs/rules.md`의 조항과 코드를 맞대어 리뷰할 때 쓰는 자료다(`Source/RankCore/AGENTS.md` "기준으로 확정하는 절차" 3번). AI는 조항마다 해당 코드의 파일과 줄을 찾고, 문장과 달라 보이는 곳을 표시만 했다. 코드가 맞는지 틀렸는지는 판정하지 않았고, 코드와 문서는 고치지 않았다(루트 `AGENTS.md` 3절 5번).
 
 - 기준 문서: `docs/rules.md` 작업 트리 판(11/20 고침: §9 17·18번 반영).
-- 줄 번호: 2026-11-20 커밋하지 않은 작업 트리 기준이다(브랜치 `feat/rules-and-rankcore`, 마지막 커밋 `64d53c3` 위에 `RankLinks.cpp`, `RankSimulate.cpp`, `RankTypes.h`의 11/20 변경이 얹힌 상태). 커밋하거나 코드를 고치면 줄이 밀린다.
+- 줄 번호: 2026-11-20 커밋하지 않은 작업 트리 기준이다(브랜치 `feat/rules-and-rankcore`, 마지막 커밋 `02c72c2` 위에 `RankLinks.cpp`, `RankSimulate.cpp`, `RankTypes.h`의 11/20 변경이 얹힌 상태). 커밋하거나 코드를 고치면 줄이 밀린다.
 - 다룬 파일: 아래 10개 전부.
 - 뺀 파일: `Source/RankCore/Public/RankRandom.h`, `Private/RankRandom.cpp`, `Public/RankPlacement.h`, `Private/RankPlacement.cpp`. 다른 작업자가 만드는 중이라 열지도, 목록을 보지도 않았다. 그래서 무작위 배치, 정수 난수기, 분대 배치를 진형(`FFormation`)으로 옮기는 코드는 이 표에 없다.
 - 보지 않은 것: 손계산 시나리오(`Source/RankTests/Fixtures/hand_v1.json`)는 열지 않았고 기대값을 계산하지 않았다. 기획 단계의 JS 참조 구현은 근거로 쓰지 않았다. `docs/rules.md`의 "한눈에 보기"는 개요라 따로 대조하지 않았다.
