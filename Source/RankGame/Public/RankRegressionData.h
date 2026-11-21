@@ -9,6 +9,13 @@
 // 전투 결과는 계산하지 않는다. 비교 항목은 Rank::Simulate의 결과에서 옮겨 적기만 한다.
 namespace RankRegression
 {
+	// 저장소 루트 기준 상대 경로. RankRegression 커맨들릿, 자동화 테스트, T11이 같은 파일을 읽는다는 것을 이 한 곳에 둔다.
+	// 에디터와 테스트는 FPaths::ProjectDir()에 붙여 쓴다.
+	inline constexpr TCHAR InputsCsvFile[] = TEXT("Source/RankTests/Fixtures/regression_inputs.csv");
+	inline constexpr TCHAR RecordJsonFile[] = TEXT("Source/RankTests/Fixtures/regression_battles_v1.json");
+	inline constexpr TCHAR UnitsCsvFile[] = TEXT("Data/defs/units.csv");
+	inline constexpr TCHAR RulesCsvFile[] = TEXT("Data/defs/rules.csv");
+
 	// Source/RankTests/Fixtures/regression_inputs.csv 한 줄. 열: id,ally_row0..3,enemy_row0..3
 	struct FBattleInputRow
 	{
@@ -20,6 +27,12 @@ namespace RankRegression
 	};
 
 	RANKGAME_API bool ParseInputsCsv(const FString& Text, TArray<FBattleInputRow>& OutRows, FString& OutError);
+
+	// 입력 한 줄을 코어 입력으로 바꾼다. 진영 0은 ally, 진영 1은 enemy다. 커맨들릿, T1, T11이 이 함수 하나를 쓴다.
+	// 돌려준 입력의 Defs는 Defs 배열의 원소를 가리킨다. 입력을 쓰는 동안 Defs를 바꾸거나 없애지 않는다.
+	RANKGAME_API Rank::FBattleInput MakeBattleInput(const FBattleInputRow& Row, const TArray<Rank::FUnitDef>& Defs, const Rank::FRuleParams& Rules);
+	// 임시 배열을 넘기면 돌려준 입력의 Defs가 곧바로 사라진 메모리를 가리키므로 막는다.
+	Rank::FBattleInput MakeBattleInput(const FBattleInputRow& Row, TArray<Rank::FUnitDef>&& Defs, const Rank::FRuleParams& Rules) = delete;
 
 	// 비교 항목(Source/RankTests/AGENTS.md T1): 결과, 틱, 이벤트 수, 해시, 성문 값, 생존 수, 체력 합, 로그 체크섬
 	struct FRecord

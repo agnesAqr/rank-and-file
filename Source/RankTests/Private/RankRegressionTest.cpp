@@ -22,8 +22,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRankT1RegressionTest, "RankAndFile.Core.T1_Reg
 
 bool FRankT1RegressionTest::RunTest(const FString& Parameters)
 {
-	const FString RecordPath = RankTests::ProjectFile(TEXT("Source/RankTests/Fixtures/regression_battles_v1.json"));
-	const FString InputsPath = RankTests::ProjectFile(TEXT("Source/RankTests/Fixtures/regression_inputs.csv"));
+	const FString RecordPath = RankTests::ProjectFile(RankRegression::RecordJsonFile);
+	const FString InputsPath = RankTests::ProjectFile(RankRegression::InputsCsvFile);
 
 	RankTests::FDefs Defs;
 	FString Error;
@@ -86,12 +86,7 @@ bool FRankT1RegressionTest::RunTest(const FString& Parameters)
 			continue;
 		}
 
-		Rank::FBattleInput Input;
-		Input.Side[0] = Row.Ally;
-		Input.Side[1] = Row.Enemy;
-		Input.Rules = Defs.Rules;
-		Input.Defs = Defs.Units.GetData();
-		Input.NumDefs = Defs.Units.Num();
+		const Rank::FBattleInput Input = RankRegression::MakeBattleInput(Row, Defs.Units, Defs.Rules);
 		const Rank::FBattleResult Result = Rank::Simulate(Input, true);
 
 		RankRegression::FRecord Actual;

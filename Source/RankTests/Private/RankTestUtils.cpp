@@ -20,7 +20,7 @@ namespace RankTests
 	bool LoadProjectDefs(FDefs& OutDefs, FString& OutError)
 	{
 		return RankContent::LoadDefsFiles(
-			ProjectFile(TEXT("Data/defs/units.csv")), ProjectFile(TEXT("Data/defs/rules.csv")),
+			ProjectFile(RankRegression::UnitsCsvFile), ProjectFile(RankRegression::RulesCsvFile),
 			OutDefs.UnitRows, OutDefs.RulesRow, OutDefs.Units, OutDefs.Rules, OutError);
 	}
 

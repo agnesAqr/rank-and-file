@@ -2,6 +2,7 @@
 #include "Misc/FileHelper.h"
 #include "RankContent.h"
 #include "RankFormationMask.h"
+#include "RankRegressionData.h"
 #include "RankTestUtils.h"
 
 // 입력 안전장치 두 가지를 본다(2026-11-20 결정, docs/review/rankcore-crossref-2026-11-20.md "확인이 필요한 곳" 6번, 7번).
@@ -91,8 +92,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRankContentDefsRejectBadValuesTest, "RankAndFi
 bool FRankContentDefsRejectBadValuesTest::RunTest(const FString& Parameters)
 {
 	// 수치는 코드에 적지 않는다. 지금 Data/defs의 글을 읽어 한 곳만 바꾼다.
-	const FString UnitsPath = RankTests::ProjectFile(TEXT("Data/defs/units.csv"));
-	const FString RulesPath = RankTests::ProjectFile(TEXT("Data/defs/rules.csv"));
+	const FString UnitsPath = RankTests::ProjectFile(RankRegression::UnitsCsvFile);
+	const FString RulesPath = RankTests::ProjectFile(RankRegression::RulesCsvFile);
 	FString UnitsText;
 	FString RulesText;
 	if (!FFileHelper::LoadFileToString(UnitsText, *UnitsPath) || !FFileHelper::LoadFileToString(RulesText, *RulesPath))

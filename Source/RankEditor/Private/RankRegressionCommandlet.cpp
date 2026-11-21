@@ -18,9 +18,8 @@ DEFINE_LOG_CATEGORY_STATIC(LogRankRegression, Log, All);
 
 namespace
 {
-	const TCHAR* const InputsFile = TEXT("Source/RankTests/Fixtures/regression_inputs.csv");
+	// 입력, 기록, Data/defs의 경로는 RankRegressionData.h에 있다. 아래 둘은 이 커맨들릿만 쓴다.
 	const TCHAR* const BranchesFile = TEXT("Source/RankTests/Fixtures/regression_branches.csv");
-	const TCHAR* const RecordFile = TEXT("Source/RankTests/Fixtures/regression_battles_v1.json");
 	const TCHAR* const TallyFile = TEXT("Saved/RankRegression/branch_tally.csv");
 
 	FString ProjectPath(const TCHAR* Relative)
@@ -572,10 +571,10 @@ int32 URankRegressionCommandlet::Main(const FString& Params)
 	const bool bOverwrite = Switches.Contains(TEXT("overwrite"));
 	const FString* CommitParam = ParamMap.Find(TEXT("commit"));
 	const FString* OutParam = ParamMap.Find(TEXT("out"));
-	const FString OutPath = OutParam ? FPaths::ConvertRelativePathToFull(*OutParam) : ProjectPath(RecordFile);
+	const FString OutPath = OutParam ? FPaths::ConvertRelativePathToFull(*OutParam) : ProjectPath(RankRegression::RecordJsonFile);
 	// -inputs=<경로>: 입력 수정안을 시험할 때만 쓴다. 고정 입력 파일을 고치지 않고 갈래 집계를 볼 수 있다. 이 인자로는 기록하지 않는다.
 	const FString* InputsParam = ParamMap.Find(TEXT("inputs"));
-	const FString InputsPath = InputsParam ? FPaths::ConvertRelativePathToFull(*InputsParam) : ProjectPath(InputsFile);
+	const FString InputsPath = InputsParam ? FPaths::ConvertRelativePathToFull(*InputsParam) : ProjectPath(RankRegression::InputsCsvFile);
 	if (InputsParam && bWrite)
 	{
 		UE_LOGFMT(LogRankRegression, Error, "-inputs는 수정안 시험용이다. -write와 함께 쓰지 않는다.");
@@ -588,7 +587,7 @@ int32 URankRegressionCommandlet::Main(const FString& Params)
 	TArray<Rank::FUnitDef> Defs;
 	Rank::FRuleParams Rules;
 	FString Error;
-	if (!RankContent::LoadDefsFiles(ProjectPath(TEXT("Data/defs/units.csv")), ProjectPath(TEXT("Data/defs/rules.csv")), UnitRows, RulesRow, Defs, Rules, Error))
+	if (!RankContent::LoadDefsFiles(ProjectPath(RankRegression::UnitsCsvFile), ProjectPath(RankRegression::RulesCsvFile), UnitRows, RulesRow, Defs, Rules, Error))
 	{
 		UE_LOGFMT(LogRankRegression, Error, "Data/defs를 읽지 못했다: {0}", Error);
 		return 1;
@@ -621,12 +620,7 @@ int32 URankRegressionCommandlet::Main(const FString& Params)
 
 	for (const RankRegression::FBattleInputRow& Row : Inputs)
 	{
-		Rank::FBattleInput Input;
-		Input.Side[0] = Row.Ally;
-		Input.Side[1] = Row.Enemy;
-		Input.Rules = Rules;
-		Input.Defs = Defs.GetData();
-		Input.NumDefs = Defs.Num();
+		const Rank::FBattleInput Input = RankRegression::MakeBattleInput(Row, Defs, Rules);
 		const Rank::FBattleResult Result = Rank::Simulate(Input, true);
 
 		RankRegression::FRecordedBattle Battle;

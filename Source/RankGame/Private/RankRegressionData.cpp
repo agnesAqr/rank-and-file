@@ -84,6 +84,17 @@ namespace RankRegression
 		return true;
 	}
 
+	Rank::FBattleInput MakeBattleInput(const FBattleInputRow& Row, const TArray<Rank::FUnitDef>& Defs, const Rank::FRuleParams& Rules)
+	{
+		Rank::FBattleInput Input;
+		Input.Side[0] = Row.Ally;
+		Input.Side[1] = Row.Enemy;
+		Input.Rules = Rules;
+		Input.Defs = Defs.GetData();
+		Input.NumDefs = Defs.Num();
+		return Input;
+	}
+
 	uint32 ComputeLogChecksum(const TArray<Rank::FBattleEvent>& Log)
 	{
 		uint32 Checksum = Rank::FnvOffsetBasis;
