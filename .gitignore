@@ -77,3 +77,10 @@ Plugins/**/Intermediate/*
 
 # Cache files for the editor to use
 DerivedDataCache/*
+
+# JetBrains 계열 IDE(Rider 등)의 개인 설정 폴더
+.idea/
+# MCP 클라이언트 설정(사람마다 다르다, 2026-11-21 결정 4 ③)
+.mcp.json
+# 에이전트가 쓰는 별도 작업 폴더(2026-11-22 결정 7)
+.claude/worktrees/
