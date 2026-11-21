@@ -30,13 +30,13 @@ namespace Rank
 	{
 		uint8 RowBits[BoardRows] = {};
 
-		// 진형판 안이고 다른 분대와 겹치지 않으면 true
+		// 진형판 안이고 다른 분대와 겹치지 않으면 true. 칸 수가 1~4가 아니면 false
 		bool CanPlace(const FShape& Shape, int32 Row, int32 Col) const;
 
 		// CanPlace가 true일 때만 부른다. 놓은 칸을 점유로 표시한다.
 		void Place(const FShape& Shape, int32 Row, int32 Col);
 	};
 
-	// 칸 단위로 단순하게 짠 같은 판정. 배치 판정 등가성 테스트(T4)의 대조군이다. 지우지 않는다.
+	// 칸 단위로 단순하게 짠 같은 판정. 배치 판정 등가성 테스트(T4)의 대조군이다. 지우지 않는다. 칸 수가 1~4가 아니면 false.
 	RANKCORE_API bool CanPlaceCellwise(const bool (&Occupied)[BoardRows][BoardCols], const FShape& Shape, int32 Row, int32 Col);
 }

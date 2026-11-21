@@ -16,10 +16,10 @@ namespace RankContent
 	// CSV 한 줄을 칸으로 나눈다. 큰따옴표가 닫히지 않으면 false.
 	RANKGAME_API bool SplitCsvLine(const FString& Line, TArray<FString>& OutFields, FString& OutError);
 
-	// Data/defs/units.csv. 열 이름과 순서가 정확히 같아야 한다.
+	// Data/defs/units.csv. 열 이름과 순서가 정확히 같아야 한다. 병과 키가 겹치면(대소문자를 가린다) 실패.
 	RANKGAME_API bool ParseUnitsCsv(const FString& Text, TArray<FRankUnitRow>& OutRows, FString& OutError);
 
-	// Data/defs/rules.csv. 데이터는 한 줄이어야 한다.
+	// Data/defs/rules.csv. 데이터는 한 줄이어야 한다. maxTicks나 gateHp가 0 이하면 실패.
 	RANKGAME_API bool ParseRulesCsv(const FString& Text, FRankRulesRow& OutRow, FString& OutError);
 
 	// 병과 키는 ASCII 한 글자다. target과 linkStat은 Data/AGENTS.md "defs"의 어휘만 받는다.

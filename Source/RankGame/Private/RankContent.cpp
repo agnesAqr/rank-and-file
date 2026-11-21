@@ -239,6 +239,16 @@ namespace RankContent
 				OutError = FString::Printf(TEXT("%s %d줄 magic: TRUE나 FALSE가 아니다(\"%s\")"), FileLabel, LineNumber, *Fields[8]);
 				return false;
 			}
+			// 병과 키가 겹치면 읽기 실패다(2026-11-20 결정, 조항 대조표 6번). 대소문자를 가린다(M과 m은 다른 병과다).
+			// 앞의 데이터 줄은 모두 OutRows에 들어갔으므로 OutRows[Prev]는 Lines[Prev + 1]이다.
+			for (int32 Prev = 0; Prev < OutRows.Num(); ++Prev)
+			{
+				if (OutRows[Prev].Key.Equals(Row.Key, ESearchCase::CaseSensitive))
+				{
+					OutError = FString::Printf(TEXT("%s %d줄 key: %d줄과 같은 병과 키다(\"%s\")"), FileLabel, LineNumber, LineNumbers[Prev + 1], *Row.Key);
+					return false;
+				}
+			}
 			OutRows.Add(MoveTemp(Row));
 		}
 		return true;
@@ -287,6 +297,17 @@ namespace RankContent
 			|| !IntField(Fields, 4, RulesColumns, FileLabel, LineNumber, Row.RangeMax, OutError)
 			|| !IntField(Fields, 5, RulesColumns, FileLabel, LineNumber, Row.IntervalMin, OutError))
 		{
+			return false;
+		}
+		// 규칙 문서가 다루지 않는 수치 입력은 읽을 때 막는다(2026-11-20 결정, 조항 대조표 6번). 코어의 ValidateInput과 §3.6은 그대로 둔다.
+		if (Row.MaxTicks <= 0)
+		{
+			OutError = FString::Printf(TEXT("%s %d줄 %s: 1 이상이어야 한다(\"%s\")"), FileLabel, LineNumber, RulesColumns[0], *Fields[0]);
+			return false;
+		}
+		if (Row.GateHp <= 0)
+		{
+			OutError = FString::Printf(TEXT("%s %d줄 %s: 1 이상이어야 한다(\"%s\")"), FileLabel, LineNumber, RulesColumns[1], *Fields[1]);
 			return false;
 		}
 		OutRow = Row;

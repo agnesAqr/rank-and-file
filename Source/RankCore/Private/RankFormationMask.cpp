@@ -38,6 +38,10 @@ namespace Rank
 
 	bool FFormationMask::CanPlace(const FShape& Shape, int32 Row, int32 Col) const
 	{
+		if (Shape.NumCells < 1 || Shape.NumCells > MaxShapeCells)
+		{
+			return false; // §2.1 분대는 1~4칸. 그 밖의 칸 수는 놓을 수 없다(2026-11-20 결정, 조항 대조표 7번)
+		}
 		uint8 ShapeBits[BoardRows] = {};
 		for (int32 Index = 0; Index < Shape.NumCells; ++Index)
 		{
@@ -71,6 +75,10 @@ namespace Rank
 
 	bool CanPlaceCellwise(const bool (&Occupied)[BoardRows][BoardCols], const FShape& Shape, int32 Row, int32 Col)
 	{
+		if (Shape.NumCells < 1 || Shape.NumCells > MaxShapeCells)
+		{
+			return false; // §2.1 분대는 1~4칸. 그 밖의 칸 수는 놓을 수 없다(2026-11-20 결정, 조항 대조표 7번)
+		}
 		for (int32 Index = 0; Index < Shape.NumCells; ++Index)
 		{
 			const int32 CellRow = Row + Shape.Cells[Index].Row;
