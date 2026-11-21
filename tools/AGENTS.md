@@ -16,7 +16,7 @@ JS 참조 구현은 이 폴더에 두지 않는다. 이 저장소의 기준이 �
 
 ## validate_content.js
 
-- 검사: UTF-8 인코딩, 열 이름과 순서, 필수 필드, 어휘 밖의 값, 값 범위, 분대 모양 문자열의 형식(`행:열;행:열`), 칸 연결성, 회전 중복, 이름 8자. 입력 형식은 `Data/AGENTS.md`의 "형식" 절이다.
+- 검사: UTF-8 인코딩, 열 이름과 순서, 필수 필드, 어휘 밖의 값, 값 범위, 분대 모양 문자열의 형식(`행:열;행:열`), 칸 연결성, 회전 중복, 이름 8자, 특성 식별자와 조합(`GateRepair`는 `Self`만, `BattleStart`는 `traitLimit` 비움), 유물 형식(`effectKind`별 `effectParam`과 `effectTarget`), 진형의 밤별 개수(2개), 대소문자만 다른 `id` 겹침. 입력 형식은 `Data/AGENTS.md`의 "형식" 절이다.
 - CSV 읽기는 내장 모듈로 직접 짠다(아래 "내장 모듈만 쓴다").
 - 하나라도 어기면 탈락이다. 경고로 낮추지 않는다. 탈락이 있으면 0이 아닌 종료 코드로 끝난다.
 - 탈락 사유는 후보 id, 어긴 규칙, 값으로 이루어진 JSON으로 낸다. 다음 생성 요청에 그대로 붙인다.
@@ -39,7 +39,12 @@ JS 참조 구현은 이 폴더에 두지 않는다. 이 저장소의 기준이 �
 - 실행하는 때: `tools\record_regression.bat`으로 기록하거나 다시 기록한 직후, 그리고 기준 확정 뒤 `tools\package.bat`으로 패키지를 만들 때마다. 빌드 동결 전 마지막 패키지에서도 돌린다.
 - 비교만 한다. 기록 파일을 만들거나 고치지 않는다.
 - 보고에는 패키지를 만든 커밋과 빌드 구성(Shipping)을 적는다.
-- [미확인] Shipping 실행 파일이 실행 인자를 읽는 방법, 결과 파일을 쓸 수 있는 위치, Shipping에서 로그가 꺼지는지, 끝날 때 종료 코드를 돌려주는 방법. 엔진 소스로 확인하고(`docs/design.md` 14.1절), 확인되면 이 표시를 지운다. 확인하기 전에 추측으로 짜지 않는다.
+- 엔진 소스로 확인한 것(UE 5.8.4, 근거와 파일:줄은 `docs/review/t11-shipping-investigation-2026-11-21.md`):
+  - 실행 인자: Shipping에서도 `FCommandLine::Get()`, `FParse::Param`, `FParse::Value`가 그대로 동작한다. 인자를 거르는 허용 목록(`UE_COMMAND_LINE_USES_ALLOW_LIST`)은 기본값이 0이고 이 프로젝트는 켜지 않았다. 실행 파일은 시작할 때 작업 디렉터리를 실행 파일 폴더로 바꾸므로 경로 인자는 절대 경로로 넘긴다.
+  - 결과 파일 위치: Shipping의 `FPaths::ProjectSavedDir()`는 사용자 폴더(로컬 AppData) 아래라 쓰지 않는다. 스크립트가 저장소 `Saved/T11/` 안의 절대 경로를 인자로 넘기고, 실행 파일은 그 경로에 쓴다. 입력 CSV와 `Data/defs`도 패키지에 넣지 않고 저장소의 파일을 절대 경로로 읽는다. 11/20 Shipping 패키지를 실행한 뒤 사용자 폴더의 `Saved` 아래에 설정 파일이 생긴 것으로도 확인했다.
+  - 로그: Shipping은 `NO_LOGGING`이라 `UE_LOG`, `UE_LOGFMT`가 Fatal 말고는 컴파일되지 않는다. 켜는 설정(`bUseLoggingInShipping`)은 설치형 엔진에서 쓸 수 없다. 판정은 결과 파일(상태, 오류 문장, 빌드 구성, 수치, 대전 20건)과 종료 코드로만 한다. 같은 실행 뒤 그 폴더의 `Logs`는 비어 있었다.
+  - 종료 코드: `FPlatformMisc::RequestExitWithStatus(true, 코드)`가 Windows에서 그 코드로 프로세스를 끝낸다. `false`로는 종료 코드가 바뀌지 않는다. 엔진은 크래시하면 3으로, 정상 종료면 0으로 끝내므로 종료 코드 0만으로 통과로 보지 않는다. 인자가 무시되면 게임이 그대로 뜨므로 시간 제한을 둔다. 에디터 테스트 실행(2026-11-21)에서 `RequestExitWithStatus(true, -1)`이 종료 코드 255로 나온 것으로 Windows의 동작을 확인했다(종료 코드는 `uint8`이다. Shipping에서는 아직 시험 전).
+- [미확인] 위 방식을 실제 Shipping 패키지에서 돌려 본 결과: `-nullrhi`로 모듈 시작까지 가는지, 모듈 시작 시점에서 돌고 강제 종료했을 때 결과 파일과 종료 코드가 남는지, 스크립트가 종료 코드를 받는지, 스테이징 루트의 `RankAndFile.exe`(부트스트랩)가 인자와 종료 코드를 넘기는지. T11 코드를 넣은 첫 패키지에서 확인하고, 확인되면 이 표시를 지운다. 확인하기 전에는 `Saved/StagedBuilds/Windows/RankAndFile/Binaries/Win64/RankAndFile-Win64-Shipping.exe`를 직접 부른다.
 
 ## hand_crosscheck.js
 
@@ -53,6 +58,6 @@ JS 참조 구현은 이 폴더에 두지 않는다. 이 저장소의 기준이 �
 
 - 실패하면 0이 아닌 종료 코드로 끝난다. 실패를 삼키지 않는다.
 - 엔진 경로는 `%UE_ROOT%`에서 읽는다. 사용자 폴더가 들어간 절대 경로를 적지 않는다.
-- `run_tests.bat`: `UnrealEditor-Cmd.exe`를 `-ExecCmds="Automation RunTests RankAndFile; Quit" -unattended -nullrhi -nosplash -stdout`으로 부르고 결과를 `Saved/TestReport`에 남긴다. 실행된 테스트가 0개면 실패로 처리한다. [미확인] 이 인자 조합은 첫 실행에서 확인하고, 확인되면 이 표시를 지운다.
+- `run_tests.bat`: `UnrealEditor-Cmd.exe`를 `-ExecCmds="Automation RunTests RankAndFile; Quit" -unattended -nullrhi -nosplash -stdout -ReportExportPath=<저장소>\Saved\TestReport`로 부르고, 보고서 `Saved/TestReport/index.json`으로 판정한다. 실행된 테스트가 0개면 실패로 처리한다. 이 조합은 2026-11-21 실행(테스트 8개 실행, 보고서 생성)으로 확인했다. 테스트가 하나라도 실패하면 에디터는 종료 코드 255로 끝난다(`Engine/Source/Developer/AutomationController/Private/AutomationCommandline.cpp:491-504`, -1이 `uint8`로 바뀐다). 스크립트는 보고서로 판정하고, 모두 통과인데 에디터 종료 코드가 0이 아니면 실패로 본다.
 - `run_sim.bat`: `-run=BalanceSim`. 모드와 시드를 인자로 받고 CSV를 `Data/reports/`에 쓴다.
 - `package.bat`: `RunUAT.bat BuildCookRun`. 인자는 에디터의 실행 프로필(Custom Launch Profile)이 만든 명령을 옮긴다. 인자를 추측으로 쓰지 않는다.

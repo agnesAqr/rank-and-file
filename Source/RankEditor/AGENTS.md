@@ -1,6 +1,6 @@
 # RankEditor 작업 규칙
 
-에디터에서만 도는 도구 셋이 있다: 콘텐츠 임포터, BalanceSim 커맨들릿(commandlet), 회귀 테스트 결과를 기록하는 RankRegression 커맨들릿. Shipping 패키지에는 들어가지 않는다. 루트와 `Source/AGENTS.md`를 먼저 읽는다.
+에디터에서만 도는 도구 넷이 있다: 콘텐츠 임포터, BalanceSim 커맨들릿(commandlet), 회귀 테스트 결과를 기록하는 RankRegression 커맨들릿, 해골 진형 생성기 커맨들릿(2026-11-21 결정 3 ⑨). Shipping 패키지에는 들어가지 않는다. 루트와 `Source/AGENTS.md`를 먼저 읽는다.
 
 ## 콘텐츠 임포터
 
@@ -10,7 +10,14 @@
 - 문제 메시지가 하나라도 나오면 임포트 전체를 실패로 처리한다. 일부만 들어간 테이블을 남기지 않는다.
 - 임포트한 뒤 DataTable의 행 수가 CSV의 항목 수(첫 줄을 뺀 줄 수)와 같아야 한다(T8).
 - 콘텐츠 버전 해시(채택본 CSV 3개와 `defs` CSV 2개의 내용을, BOM을 빼고 줄바꿈을 LF로 맞춘 뒤 FNV-1a로 묶은 값)를 함께 저장한다.
-- CSV는 `UDataTable::CreateTableFromCSVString`으로 읽는다. [미확인] 이 함수의 5.8 동작(첫 열을 행 이름으로 쓰는지, 문제 메시지를 돌려주는지)을 엔진 소스로 확인하고, 결과를 `docs/decisions.md`에 적은 뒤 이 표시를 지운다.
+- CSV는 `RankGame`의 CSV 읽기 함수로 읽고, 읽은 행 구조체를 `UDataTable::AddRow`로 넣는다. 엔진 CSV 임포트(`CreateTableFromCSVString`)는 쓰지 않는다(2026-11-21 결정 4 ④). 5.8.4의 `AddRow`는 에디터 전용이 아니고, 문제 메시지를 돌려주지 않고, 같은 행 이름이 있으면 경고 없이 덮어쓰고, 한 형태(`AddRow(이름, 행)`)는 넘긴 행의 형을 `RowStruct`와 맞춰 보지 않는다(엔진 소스로 확인, `Engine/Source/Runtime/Engine/Private/DataTable.cpp:519-560`). 그래서 임포터는 `RowStruct`를 먼저 정하고, 형을 받는 형태(`AddRow(이름, 데이터, 구조체)`)로 넣고, 넣기 전에 행 이름 겹침(대소문자 무시)을 검사한다. 읽기 함수의 오류나 겹침이 하나라도 있으면 에셋을 저장하지 않고 실패로 끝낸다. 저장은 `UPackage::SavePackage`로 한다. 행 구조체의 필드는 모두 `UPROPERTY`여야 에셋에 남는다.
+- 행 이름: 콘텐츠 CSV는 첫 열 `id`다. `defs`의 두 파일(`units.csv`, `rules.csv`)은 CSV의 줄 번호(1부터)이고, 병과 키는 열로 둔다. 행 이름(`FName`)이 대소문자를 가리지 않아 병과 키 `M`과 `m`, `R`과 `r`을 행 이름으로 쓸 수 없다(`Engine/Source/Runtime/Core/Public/UObject/NameTypes.h:628`, 2026-11-22 결정).
+
+## 해골 진형 생성기
+
+- 밤별 예산(`Data/AGENTS.md` "해골 진형")에 맞춰 해골 진형 후보를 만든다. 난수는 `RankCore`의 정수 난수기(`RankRandom`)만 쓰고, 같은 시드면 같은 후보가 나온다.
+- 후보는 `Data/candidates/roundN/formations.csv`에 쓴다. 관문 1과 관문 2(BalanceSim `formation` 모드)를 거쳐 사람이 채택한다.
+- 전투 결과는 계산하지 않는다. 거르는 것은 BalanceSim이다.
 
 ## BalanceSim
 

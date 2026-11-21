@@ -85,10 +85,10 @@ flowchart LR
 | `RankCore` | Runtime | 엔진 Core만 | 규칙, 전투, 이벤트 로그, 해시, 링크 계산, 배치 판정 | 포함 |
 | `RankGame` | Runtime | RankCore | 런 진행, 전투 재생, UI, 설정, DataTable 행 구조체와 코어 구조체 변환 | 포함 |
 | `RankEditor` | Editor | RankCore, RankGame | CSV → DataTable 임포터, BalanceSim·RankRegression 커맨들릿(commandlet) | 제외 |
-| `RankTests` | Editor [제안] | RankCore, RankGame | 자동화 테스트 | 제외 |
+| `RankTests` | Editor | RankCore, RankGame | 자동화 테스트 | 제외 |
 
 - 모듈 4개와 그 역할은 기획서 §4를 따른다.
-- [제안] `RankEditor`와 `RankTests`가 `RankGame`에도 의존하게 한다. 이유: `RankCore`는 UObject를 쓰지 않으므로 DataTable 행 구조체(USTRUCT)를 둘 수 없다. 행 구조체와 "행 → 코어 구조체" 변환 함수를 `RankGame`에 하나만 두고, 게임, 임포터, 시뮬레이터가 같은 함수를 쓴다.
+- `RankEditor`와 `RankTests`는 `RankGame`에도 의존한다(만들어 둠: `RankAndFile.uproject`, `RankTests.Build.cs`, `RankEditor.Build.cs`). 이유: `RankCore`는 UObject를 쓰지 않으므로 DataTable 행 구조체(USTRUCT)를 둘 수 없다. 행 구조체와 "행 → 코어 구조체" 변환 함수를 `RankGame`에 하나만 두고, 게임, 임포터, 시뮬레이터가 같은 함수를 쓴다.
 - Editor 타입 모듈은 런타임 빌드에 컴파일되지 않는다([Epic: Unreal Engine Modules](https://dev.epicgames.com/documentation/en-us/unreal-engine/unreal-engine-modules)). 테스트와 시뮬레이터를 Shipping 패키지에서 빼는 근거다.
 
 ### 4.2 경계 규칙
@@ -115,7 +115,7 @@ flowchart LR
 rank-and-file/
 ├─ RankAndFile.uproject
 ├─ AGENTS.md                  AI 작업 규칙: 완료 기준, 금지 사항, 검증 명령
-├─ README.md                  AI 작업 방식, 검증 기록, 크레딧
+├─ README.md                  게임 소개, 구조, 빌드, 검증 기록, AI 활용, 크레딧
 ├─ docs/
 │  ├─ design.md               이 문서
 │  ├─ rules.md                전투 규칙 8조항 (기획서 §2)
@@ -175,6 +175,8 @@ namespace Rank
 ```
 
 `Simulate`는 입력만으로 결과가 정해지는 함수다. 전역 상태를 읽거나 쓰지 않는다.
+
+- 특성과 유물(`docs/rules.md` §10)을 위해 더할 것 [제안]: 칸마다 분대 번호, 분대마다 특성(언제·무엇·누구·N·L), 진영 0의 유물 목록, 진영마다 규칙 매개변수(유물이 진영 0의 값만 바꾼다), 유닛마다 보호막, 이벤트 종류 5~11. 구현은 기준 확정 뒤에 하고, 공개 형태가 바뀌므로 구현 전에 알린다(`Source/RankCore/AGENTS.md`).
 
 ### 6.2 병과와 규칙 매개변수 [초기값]
 
@@ -280,24 +282,14 @@ namespace Rank
 
 `FFormationMask`는 행마다 비트 6개로 점유를 표시하고, 한 행을 AND 한 번으로 검사한다 (기획서 §4). 같은 판정을 배치 UI와 탐색 봇이 함께 쓴다. 칸 단위로 단순하게 짠 구현과 결과가 같은지 무작위 1만 건으로 대조한다. EXFIL에서 쓴 등가성 검증 방식이다(90케이스 Before == After 90/90 [측정], [EXFIL 벤치마크 문서](https://github.com/agnesAqr/project_EXFIL/blob/main/docs/Benchmarks/GridInventoryBitmap.md)).
 
-### 6.8 특성과 유물 [제안] [미정]
+### 6.8 특성과 유물 (11/22 확정)
 
-기획서 §3은 특성을 어휘 조각의 조합으로 정했다: 언제 5종(전투 시작, 공격할 때, 맞을 때, 처치할 때, 아군이 쓰러질 때) × 무엇 6종(공격+, 방어+, 회복, 보호막, 간격−, 성문 수리) × 누구 5종(자신, 링크된 이웃, 같은 열, 같은 분대, 아군 전체). 코드는 조각 16개만 구현한다.
+처리 시점, 조각, 대상, 이벤트는 `docs/rules.md` §10이 기준이다(2026-11-22 결정). 이 절은 구현 계획만 적는다.
 
-참조 구현에는 특성과 유물이 없다. 처리 시점이 정해져 있지 않으므로 아래를 제안한다.
-
-| 항목 | 제안 |
-|---|---|
-| 처리 시점 | 발동 조건은 6.4의 ③(공격, 피격)과 ④(처치, 쓰러짐)에서 생긴다. 효과는 바로 적용하지 않고 대기열에 넣는다. ④가 끝난 뒤 ⑤ 전에 발생 순서대로 한꺼번에 적용한다 |
-| 전투 시작 효과 | 유닛 생성 직후 한 번 적용한다 |
-| 대상 | 적용 시점에 살아 있는 유닛만 대상이다. 회복은 최대 체력을 넘지 않는다 |
-| 횟수 제한 | 조각의 `limit`은 전투당 발동 횟수다. 유닛마다 센다 |
-| 유물 | 규칙 매개변수를 바꾸거나(예: 최대 틱 −50), 조건에 맞는 유닛에 전투 시작 효과를 준다 |
-| 이벤트 | 종류 값 5 '효과'를 추가한다: 틱, 5, 발동 유닛 번호, 대상 번호, 값 |
-
-효과가 모두 더하기라서 대기열 안의 적용 순서가 결과를 바꾸지 않는다. 미러 전투가 무승부라는 성질도 유지된다.
-
-검증: 조각마다 AI가 규칙 문서로 계산하고 교차 검증한 예제를 2개 이상 테스트로 둔다(9절 T7). 결정성과 미러 테스트는 특성이 들어간 덱으로 다시 돌린다.
+- 조각 16개(언제 5, 무엇 6, 누구 5)를 모두 구현한다(11/21 결정 3 ①, 범위 축소에서 줄이지 않음). 데이터 식별자와 형식은 `Data/AGENTS.md`의 분대(`trait*`)와 유물(`effect*`)이다.
+- 구현은 기준 확정 뒤에 한다(11/22 결정). 코어 입력에 더할 것은 6.1의 [제안]이다.
+- 검증: 조각마다 AI가 §10으로 계산하고 교차 검증한 예제를 2개 이상 둔다(T7). 특성이 들어간 덱으로 결정성과 미러 테스트를 다시 돌린다(유물은 진영 0에만 쓰므로 미러에 넣지 않는다). 특성과 유물이 없는 전투의 결과와 해시는 그대로여야 한다(T1).
+- 11/21까지의 제안 표는 §10으로 바뀌었다. 효과 이벤트는 종류 하나(5)가 아니라 효과마다 5~11이고(§10.8), 최대 틱을 바꾸는 유물은 만들지 않는다(11/21 결정 3 ⑦).
 
 ## 7. 콘텐츠 데이터
 
@@ -305,11 +297,13 @@ namespace Rank
 
 | 종류 | 출시 목표 | 후보 수 | 파일 |
 |---|---|---|---|
-| 분대 카드 | 24 | 60 | `accepted/squads.csv` |
-| 유물 | 12 | 30 | `accepted/relics.csv` |
-| 해골 진형 | 36 (밤마다 3개) | 90 | `accepted/formations.csv` |
+| 분대 카드 | 16 | 60 | `accepted/squads.csv` |
+| 유물 | 6 | 30 | `accepted/relics.csv` |
+| 해골 진형 | 24 (밤마다 2개) | 생성기가 만든다(후보 수는 생성기 인자) | `accepted/formations.csv` |
 | 병과 수치 | 9 | | `defs/units.csv` |
 | 규칙 매개변수 | 1 | | `defs/rules.csv` |
+
+출시 목표는 11/21 범위 축소와 결정 3 ⑥으로 바꿨다. 해골 진형은 AI가 만들지 않고 `RankEditor`의 생성기가 만든다(11/20 결정).
 
 ### 7.2 형식
 
@@ -322,18 +316,19 @@ id,name,class,shape,tier,traitWhen,traitDo,traitWho,traitN,traitLimit
 sq_K_L3_02,성벽 방패대,K,0:0;1:0;1:1,2,OnHit,Shield,Linked,2,3
 ```
 
-해골 진형 [제안]
+해골 진형
 
 ```csv
 id,night,kind,row0,row1,row2,row3
 fm_n07_a,7,normal,wwmmww,mrmmrm,.g..g.,..rr..
 ```
 
-유물 [제안]
+유물
 
 ```csv
-id,name,effectKind,effectParam,effectDelta
-rl_dawn_bell,새벽의 종,Rule,MaxTicks,-50
+id,name,effectKind,effectParam,effectDelta,effectTarget
+rl_iron_gate,철문,Rule,GateHp,10,
+rl_war_drum,전쟁 북,Start,AtkUp,1,B
 ```
 
 카드 설명문은 데이터에 넣지 않는다. 조각에서 템플릿으로 만든다 (기획서 §5). 예: "맞을 때 링크된 이웃에게 보호막 2 (전투당 3회)".
@@ -341,7 +336,7 @@ rl_dawn_bell,새벽의 종,Rule,MaxTicks,-50
 ### 7.3 게임에 들어가는 경로
 
 1. `tools/validate_content.js`가 관문 1을 검사한다(10절).
-2. `RankEditor`의 임포터가 `Data/accepted/*.csv`를 DataTable 에셋으로 바꾼다. [미확인] `UDataTable::CreateTableFromCSVString`(5.8 엔진 소스로 확인)을 쓴다. DataTable 임포트 함수는 행 구조체가 먼저 정의돼 있어야 하고, 문제 메시지 목록을 돌려준다([Epic API: UDataTable](https://dev.epicgames.com/documentation/en-us/unreal-engine/API/Runtime/Engine/UDataTable)). 메시지가 하나라도 있으면 임포트를 실패로 처리한다.
+2. `RankEditor`의 임포터가 `Data/accepted/*.csv`를 DataTable 에셋으로 바꾼다. CSV는 `RankGame`의 읽기 함수로 행 구조체로 읽고, 행을 `UDataTable::AddRow`로 넣는다. 엔진 CSV 임포트는 쓰지 않는다(11/21 결정 4 ④: 첫 열과 열 이름을 구조체에 맞춰야 하고 읽는 경로가 둘이 된다). `AddRow`는 문제 메시지를 돌려주지 않고 같은 행 이름을 경고 없이 덮어쓰므로(5.8.4 `Engine/Source/Runtime/Engine/Private/DataTable.cpp:519-560`), 임포터가 읽기 함수의 오류와 id 겹침(행 이름 `FName`은 대소문자를 가리지 않는다)을 모아 하나라도 있으면 저장하지 않고 실패로 처리한다. 저장한 테이블의 행 수가 CSV 항목 수와 같은지는 T8이 본다. `defs`의 두 파일은 CSV 줄 번호를 행 이름으로 쓴다(11/22 결정).
 3. 분대 모양은 `0:0;1:0;1:1` 같은 문자열 한 칸이다. 칸 목록으로 바꾸는 일은 `RankGame`의 변환 함수가 맡는다(11/18 CSV로 바꾸며 "배열 안의 배열" 문제가 없어졌다).
 4. 콘텐츠 버전 해시: 채택본 CSV 3개와 `defs` CSV 2개의 내용을, BOM을 빼고 줄바꿈을 LF로 맞춘 뒤 FNV-1a로 묶은 값을 빌드에 넣고 결과 화면과 README에 적는다 (기획서 §5). 어느 콘텐츠로 잰 수치인지 구분하는 데 쓴다.
 5. 입력 오류를 읽을 때 막는다(11/20 결정, `docs/rules.md` §3.6): `formations.csv`를 읽을 때 병과 수치(`defs/units.csv`)에 없는 병과 키가 있거나 병사가 한 명도 없는 진형은 읽기 실패로 처리한다. 이 검사는 `formations.csv`를 읽는 쪽(아직 없다)에 두고 `RankContent::ParseFormationRows`에는 두지 않는다. 손계산 시나리오가 그 함수로 모르는 병과 키를 읽어 코어의 §3.6을 확인하기 때문이다.
@@ -364,9 +359,9 @@ stateDiagram-v2
 
 - 한 밤은 보상 → 배치 → 전투 → 결과다. 보상은 분대나 유물 3장 중 1장이고, 섬멸로 이긴 다음 밤에는 다시 뽑기를 1번 준다 (기획서 §3).
 - 4·8번째 밤은 정예, 12번째 밤은 우두머리다. 패배가 3번 쌓이면 런이 끝난다 (기획서 §3).
-- [미정] 시작 덱과 밤별 기대 덱 크기가 기획서에 없다(15절 2번).
+- 시작 덱 [초기값]: 분대 3개(병사 5~6명), 밤마다 보상 3장 가운데 1장, 분대와 유물 2:1, 기대 덱 밤 3 약 6명·밤 7 약 10명·밤 12 약 12명. BalanceSim으로 잰 뒤 다시 정한다(11/21 결정 3 ⑤).
 - 입력 오류(`docs/rules.md` §3.6)는 판정하지 않으므로(§5.2) 패배로 세지 않는다(11/20 결정). `Rank::Judge`의 `bJudged`가 false면 `bWin`을 보지 않는다. 아군 진형판이 비는 경우는 배치 화면이 막고(8.3절), 모르는 병과 키와 빈 해골 진형은 `formations.csv`를 읽을 때 막는다(7.3절).
-- 그래도 런 중에 해골 진형판이 비어 있으면 그 밤의 다른 진형으로 바꿔 다시 시작한다. 2번 바꿔도 안 되면 오류를 UI로 알리고 게임을 끝낸다(11/20 결정). 밤마다 진형이 3개라 2번까지 바꿀 수 있다.
+- 그래도 런 중에 해골 진형판이 비어 있으면 그 밤의 다른 진형으로 바꿔 다시 시작한다. 1번 바꿔도 안 되면 오류를 UI로 알리고 게임을 끝낸다(11/20 결정, 11/21 바꿈: 2번 → 1번). 11/21 범위 축소로 해골 진형이 24개라 밤마다 진형이 2개이고, 그래서 1번까지 바꿀 수 있다.
 
 `URunSubsystem` [제안]: `UGameInstanceSubsystem`으로 만든다. 게임 인스턴스와 수명이 같고 인스턴스가 초기화될 때 `Initialize()`가 불린다([Epic: Programming Subsystems](https://dev.epicgames.com/documentation/en-us/unreal-engine/programming-subsystems-in-unreal-engine)). 레벨을 바꿔도 런 상태가 남는다.
 
@@ -376,7 +371,7 @@ stateDiagram-v2
 | 난수 | 런 레이어 전용 정수 난수기. 보상 카드와 해골 진형 선택에만 쓴다 (기획서 §4). 상태를 `FRunState`에 둔다 |
 | 하지 않는 것 | 전투 계산. `Rank::Simulate`를 부르고 결과를 보관할 뿐이다 |
 
-시드와 선택 이력만 있으면 런 전체를 다시 만들 수 있다. 버그 재현과 저장 기능(15절 7번)이 이 성질을 쓴다.
+시드와 선택 이력만 있으면 런 전체를 다시 만들 수 있다. 버그 재현이 이 성질을 쓴다. 저장과 이어하기는 만들지 않는다(11/21 범위 축소).
 
 ### 8.2 전투 재생
 
@@ -387,7 +382,7 @@ stateDiagram-v2
 | 유닛 | 유닛마다 액터 1개(스켈레탈 메시). 위치는 열과 대열 순번에서 정한다. 대열 전진만 보간한다. float은 여기서만 쓴다 |
 | 체력 | 재생기가 계산하지 않는다. 이벤트의 값을 빼서 표시한다 |
 | 일시정지 | 재생 시계를 멈춘다 |
-| 애니메이션 | 먼저 `USkeletalMeshComponent::PlayAnimation`으로 이벤트마다 시퀀스를 직접 재생한다(단일 노드 모드, 블렌딩 없음). 끊김이 거슬리면 C++ `UAnimInstance` 하위 클래스를 부모로 한 애니메이션 블루프린트에서 블렌딩을 조정한다. 상태 값은 C++이 정하고 블루프린트에는 애니메이션 그래프만 둔다. [미확인] 끊김이 눈에 띄는지는 11/17 첫 재생에서 본다 |
+| 애니메이션 | 먼저 `USkeletalMeshComponent::PlayAnimation`으로 이벤트마다 시퀀스를 직접 재생한다. 5.8.4에서 이 함수는 메시를 단일 노드 모드로 바꾸고 시퀀스를 바로 바꾼다(섞는 시간 인자가 없다, `Engine/Source/Runtime/Engine/Private/Components/SkeletalMeshComponent.cpp:4278-4289`). BeginPlay 뒤에 부른다(생성 스크립트에서 부르지 말라는 엔진 주석, `SkeletalMeshComponent.h:1251-1255`). 블렌딩 조정은 시간이 남으면 하는 항목이다(11/21 범위 축소). 그때 본인이 C++ `UAnimInstance` 하위 클래스를 부모로 한 애니메이션 블루프린트를 에디터에서 만든다(11/21 AI 기능 결정 ⑤). 상태 값은 C++이 정하고 블루프린트에는 애니메이션 그래프만 둔다. [미정] 끊김이 거슬리는지는 본인이 첫 재생 화면을 보고 정한다 |
 | 확인 [제안] | 재생이 끝났을 때 화면의 생존 수와 성문 값이 `FBattleResult`와 같은지 개발 빌드에서 검사한다 |
 
 이벤트와 애니메이션 (기획서 §4, GLB에서 이름 확인)
@@ -404,16 +399,16 @@ stateDiagram-v2
 | 해골 궁수 | `2H_Ranged_Shoot` | `Hit_A` | `Death_B` |
 | 해골 술사 | `Spellcast_Shoot` | `Hit_B` | `Death_B` |
 
-해골 등장은 `Spawn_Ground_Skeletons`, 아군 승리는 `Cheer`다.
+해골 등장은 `Spawn_Ground_Skeletons`, 아군 승리는 `Cheer`다. 대기는 `Idle_Combat`, 전진은 아군 `Walking_A`, 해골 `Walking_D_Skeletons`다(11/21 결정 4 ②).
 
 ### 8.3 배치 화면
 
-- 6×4 진형판, 분대 드래그, 회전(R), 링크 표시 (일정표 11/17).
+- 6×4 진형판, 분대를 고르고 3D 전장의 칸을 클릭해 놓기(클릭 배치), 회전(R), 링크 표시(11/21 범위 축소, 결정 3 ③).
 - 놓을 수 있는지는 `FFormationMask::CanPlace`, 링크와 최종 능력치 미리보기는 `Rank::ComputeLinks`로 계산한다.
 - 병사를 한 명도 놓지 않으면 전투 시작 버튼을 누를 수 없게 한다(11/18, `docs/rules.md` §3.6). 분대는 돌리기만 하고 뒤집지 않는다(§2.1).
 - 아군 진형판이 빈 채로 전투를 시작하려 하면 경고 UI로 알리고 전투를 시작하지 않는다. 패배로 세지 않는다(11/20 결정).
-- [제안] 입력은 격자 위젯에서 받는다. 동작은 C++, 배치와 모양은 에디터에서 조정한다. 조작이 웹 참조 시뮬레이터와 같고, 화면 좌표를 칸으로 바꾸는 코드가 한 곳에 모인다. 3D 전장에는 놓인 결과만 보여 준다(15절 5번).
-- 판정 B에서 드래그가 안 되면 클릭 배치로 줄인다 (일정표).
+- 입력은 3D 전장 위 클릭이다(11/21 결정 3 ③, AI 권장안은 격자 위젯이었다). 화면 좌표를 칸으로 바꾸는 코드는 한 곳에 둔다.
+- 배치 화면에서 그 밤의 해골 진형을 모두 보여 준다(11/21 결정 3 ②).
 - 배치에 1분 넘게 걸리면 우클릭·휠 회전과 직전 배치 불러오기를 넣는다 (기획서 §8).
 
 ### 8.4 화면과 UI 구조
@@ -431,40 +426,43 @@ stateDiagram-v2
 
 - UI는 MVVM으로 나눈다 (기획서 §4). EXFIL에서 같은 구조를 썼다.
 - 뷰모델은 C++ 클래스이고 값이 바뀌면 델리게이트로 알린다. UMG Viewmodel 플러그인은 쓰지 않는다. 기획서 §8의 플러그인 최소화와 맞다(11/17).
-- 위젯의 동작(입력 처리, 뷰모델 연결, 표시 갱신)은 C++ `UUserWidget` 하위 클래스에 둔다. 배치, 글꼴, 색, 크기는 그 클래스를 부모로 한 위젯 블루프린트에서 조정하고, C++은 `meta=(BindWidget)`으로 이름이 같은 위젯을 받는다. 위젯 블루프린트의 이벤트 그래프는 비워 둔다(11/17). [미확인] `BindWidget`은 공식 문서보다 포럼과 커뮤니티 위키에 설명이 있다([포럼](https://forums.unrealengine.com/t/binding-a-uuserwidget-c-property-to-widget-blueprint-subwidget/632575), [커뮤니티 위키](https://unrealcommunity.wiki/uproperty-0cj0ai46)). 5.8 엔진 헤더에서 확인한다.
-- [미정] 배치를 처음부터 위젯 블루프린트 디자이너로 할지, 코드로 배치하고 조정값만 에디터에 열어 둘지(15절 6번). [판단] 디자이너 배치가 조정과 이어지고 시간이 덜 든다. 코드로 짠 위젯 트리는 디자이너에서 고칠 수 없다. 11/17 배치 화면 하나로 정한다.
+- 위젯의 동작(입력 처리, 뷰모델 연결, 표시 갱신)은 C++ `UUserWidget` 하위 클래스에 둔다. 배치, 글꼴, 색, 크기는 그 클래스를 부모로 한 위젯 블루프린트에서 조정하고, C++은 `meta=(BindWidget)`으로 이름이 같은 위젯을 받는다. 위젯 블루프린트의 이벤트 그래프는 비워 둔다(11/17). `BindWidget`의 5.8.4 동작은 엔진 소스로 확인했다(11/21): 위젯 블루프린트 컴파일러가 이름과 형을 검사해 없으면 오류를 내고(`Engine/Source/Editor/UMGEditor/Private/WidgetBlueprintCompiler.cpp:1257-1305`), 실행 중에는 이름이 같은 속성에 위젯을 넣는다(`Engine/Source/Runtime/UMG/Private/WidgetBlueprintGeneratedClass.cpp:270-277`). 상세는 `docs/review/unconfirmed-check-2026-11-21.md` 1번.
+- 위젯 배치는 처음부터 위젯 블루프린트 디자이너에서 한다. 위젯 블루프린트는 AI가 MCP(UMG ToolSet)로 만들고, 본인이 캡처를 보고 받아들인다(11/21 결정 3 ④).
 - [제안] 레벨은 `L_Field` 하나만 둔다. 메뉴와 각 화면은 같은 전장 위에 UI로 띄운다. 레벨 전환과 쿠킹 대상이 줄어든다.
 
 ### 8.5 설정, 사운드, 저장
 
 - 해상도와 창 모드는 `UGameUserSettings`의 `SetScreenResolution`, `SetFullscreenMode`로 정하고 `ApplySettings`로 적용·저장한다([Epic API: UGameUserSettings](https://dev.epicgames.com/documentation/en-us/unreal-engine/API/Runtime/Engine/UGameUserSettings)).
 - 음량은 마스터 하나만 둔다 [제안].
-- 사운드는 이벤트 종류마다 하나씩 붙인다(공격, 피격, 쓰러짐, 부활, 성문 타격, 승리, 패배). 사운드 팩의 내용과 라이선스는 아직 확인하지 않았다 (기획서 §9).
-- 저장과 이어하기는 버리는 순서 3번이다 (일정표). 만든다면 `FRunState`의 시드와 선택 이력만 저장한다 [제안].
+- 사운드는 이벤트 종류마다 하나씩 붙인다(공격, 피격, 쓰러짐, 부활, 성문 타격, 승리, 패배). 사운드 팩의 내용과 라이선스는 아직 확인하지 않았다 (기획서 §9). 사운드는 최소로 한다(11/21 범위 축소).
+- 저장과 이어하기는 만들지 않는다(11/21 범위 축소).
 
 ### 8.6 에셋
 
 | 대상 | 계획 | 확인할 것 |
 |---|---|---|
-| 캐릭터 9종 | KayKit Adventurers 5종, Skeletons 4종. Skeleton 에셋 하나를 함께 쓴다. 재생은 C++이 먼저 하고, 블렌딩 조정이 필요해지면 C++ 부모를 둔 애니메이션 블루프린트 하나를 9종이 함께 쓴다 | 11/17 첫 작업. 9종은 관절 41개, 이름이 같다(기획서 §10, GLB 확인) |
-| 배경 | AI로 생성한 이미지 2장(바닥, 원경). 아래 "배경" 항목 | 11/16 생성. 유닛과 화풍이 맞는지, 진형이 읽히는지 |
+| 캐릭터 9종 | KayKit Adventurers 5종, Skeletons 4종. Skeleton 에셋 하나를 함께 쓴다. 재생은 C++이 먼저 하고, 블렌딩 조정은 시간이 남으면 본인이 C++ 부모를 둔 애니메이션 블루프린트 하나를 만들어 9종이 함께 쓴다 | 9종 받음(11/21). 관절 41개의 이름과 순서가 같다 [측정: 11/21, GLB JSON 청크]. 임포트는 본인이 임포트 창에서 한다 |
+| 배경 | [보류, 11/21] AI로 생성한 이미지 3장(아군 쪽 바닥 타일, 적 쪽 바닥 타일, 원경). 기준은 `docs/background.md`, 아래 "배경" 항목은 첫 안 | 11/16 생성. 유닛과 화풍이 맞는지, 진형이 읽히는지 |
 | 가장자리 소품(선택) | Halloween Bits와 Dungeon Remastered의 조각 몇 개로 깊이감을 보탠다 | 호박 같은 계절 소품은 뺀다 (기획서 §9) |
 
 - 임포트할 때 Skeleton 항목에 기존 Skeleton을 지정하면 그 Skeleton을 쓰고, 비워 두면 새로 만든다([Epic: Interchange Import Reference](https://dev.epicgames.com/documentation/unreal-engine/interchange-import-reference-in-unreal-engine)).
-- Skeleton을 함께 쓰려면 본의 계층 순서와 이름이 같아야 한다([Epic: Importing Skeletal Meshes Using FBX](https://dev.epicgames.com/documentation/en-us/unreal-engine/importing-skeletal-meshes-using-fbx-in-unreal-engine)). [판단] 관절 이름이 같다는 것은 확인됐으므로 가능성이 높다. 계층 순서는 임포트해 봐야 안다.
+- Skeleton을 함께 쓰려면 본의 계층 순서와 이름이 같아야 한다([Epic: Importing Skeletal Meshes Using FBX](https://dev.epicgames.com/documentation/en-us/unreal-engine/importing-skeletal-meshes-using-fbx-in-unreal-engine)). 5.8.4의 Interchange는 본마다 이름과 부모 사슬(루트 본 이름 포함)이 Skeleton과 같은지 본다(`Engine/Plugins/Interchange/Runtime/Source/Import/Private/Mesh/InterchangeSkeletonHelper.cpp` 90~180, 422~447줄). [측정: 11/21, GLB JSON 청크] 9종 모두 관절 41개의 이름과 순서가 같다. `Knight.glb`와 `Skeleton_Minion.glb`는 부모와 노드 로컬 변환까지 같다.
 - 공유가 안 되면 IK Retargeter로 맞춘다 (일정표 판정 B).
 
 에셋 파일 확인 결과 (11/16, KayKit 저장소 4개의 파일을 직접 파싱)
 - 캐릭터 9종은 GLB(glTF 2.0)와 FBX(바이너리 7400) 두 형식으로 있다. GLB를 쓴다 [제안]: 텍스처가 파일 안에 들어 있다.
 - 9종 모두 관절 41개이고 이름과 계층 순서가 같다. 정점당 본 영향은 최대 4개다.
 - 모험가 파일에는 애니메이션 76개, 해골 파일에는 95개가 있고, 해골 쪽에 모험가 76개의 이름이 모두 있다. 애니메이션은 해골 파일 하나에서 한 번만 가져온다 [제안].
-- 무기, 모자, 망토는 캐릭터 파일 안에 본에 붙은 별도 메시로 들어 있다(기사는 방패 4개와 검 2개). 몸만 가져오고, 무기는 `Assets/gltf`의 개별 파일을 `handslot.l`, `handslot.r` 본에 붙인다 [제안].
+- 모험가 5종은 무기, 모자, 망토가 캐릭터 파일 안에 본에 붙은 별도 메시로 들어 있다(기사는 방패 4개와 검 3개: `1H_Sword_Offhand`, `1H_Sword`, `2H_Sword`). 파일에 붙은 메시를 쓰고, 여러 개인 방패·검은 하나만 남기고 숨긴다(11/21 결정 4 ①). 숨기는 방법은 임포트 결과를 보고 정한다 [미확인].
+- 해골 4종의 파일에는 무기가 없다(11/21 측정). 같은 팩의 `Assets/gltf/`에서 졸개 `Skeleton_Blade`, 전사 `Skeleton_Axe`와 작은 방패, 궁수 `Skeleton_Crossbow`, 술사 `Skeleton_Staff`를 받아 `handslot.l`, `handslot.r` 본에 붙인다(11/22 결정). 파일은 받을 때 이름·크기를 보이고 허락을 받는다.
 
 배경 (AI 생성 이미지) [제안]
 
+[보류] 11/21부터 배경 작업은 보류다(본인이 3D 생성 AI로 바꾸는 중, 11/22 시안은 면을 5만 개로 줄였다). 아래는 2D 계획이다.
+
 상세 기획은 `docs/background.md`가 기준이다(11/16). 그 문서에서 바닥을 타일 2장(아군 쪽, 적 쪽, 각 2048×2048)과 원경 1장으로 바꿨다. 아래 표는 첫 안으로 남긴다.
 
-전장은 하나이고 카메라는 고정이다. 배경을 이미지 2장으로 나눈다.
+전장은 하나이고 카메라는 고정이다. 첫 안은 배경을 이미지 2장으로 나눴다(지금 기준은 위 문단의 3장).
 
 | 이미지 | 쓰는 곳 | 크기 | 지켜야 할 것 |
 |---|---|---|---|
@@ -494,7 +492,7 @@ stateDiagram-v2
 |---|---|
 | 게임 모드, 플레이어 컨트롤러 지정 | C++ 클래스를 `Config/DefaultEngine.ini`에 지정 |
 | 에셋 연결(메시, 애니메이션, 텍스처, 사운드) | C++ 데이터 에셋 클래스(`UPrimaryDataAsset` 하위)의 인스턴스 `DA_`에 담는다. 데이터 에셋은 블루프린트가 아니다 |
-| 애니메이션 | 먼저 `PlayAnimation`으로 시퀀스 직접 재생. 블렌딩 조정은 C++ 부모를 둔 애니메이션 블루프린트의 애니메이션 그래프에서(8.2) |
+| 애니메이션 | 먼저 `PlayAnimation`으로 시퀀스 직접 재생. 블렌딩 조정은 시간이 남으면 본인이 만드는 애니메이션 블루프린트의 애니메이션 그래프에서(8.2) |
 | UI | 동작은 C++ 위젯 클래스, 배치와 모양은 그 클래스를 부모로 한 위젯 블루프린트에서 조정(8.4) |
 | 조정할 수치(재생 속도, 연출 시간, 색) | `EditDefaultsOnly` 속성이나 데이터 에셋으로 열어 두고 에디터에서 바꾼다 |
 | 레벨 연출 | 레벨에 놓은 C++ 액터나 서브시스템 |
@@ -502,8 +500,8 @@ stateDiagram-v2
 
 - 지키는 것: 위젯 블루프린트와 애니메이션 블루프린트의 이벤트 그래프는 비워 둔다. 블루프린트에서 로직을 부르게 하는 지정자(`BlueprintCallable`, `BlueprintImplementableEvent` 등)를 쓰지 않는다. 조정이 조건이나 계산이 되면 C++로 옮긴다.
 - 이유 [판단]: 블루프린트 안의 로직은 자동화 테스트와 코드 리뷰에 걸리지 않는다. 로직이 C++에 있으면 AI가 만든 변경을 텍스트 차이로 검토할 수 있다. 배치와 블렌딩은 숫자로 검증할 수 없고 눈으로 맞추는 일이라 에디터가 빠르다.
-- 나누는 일(11/17): 위젯·애니메이션 블루프린트는 AI가 Unreal MCP를 통해서만 만들고 설정한다. 이벤트 그래프는 비우고, 결과는 개수(Skeleton 1개, 바인딩 위젯 수, 이벤트 그래프 노드 0개)와 캡처로 확인한다. 받아들일지와 마지막 미세 조정은 본인이 한다. Unreal MCP는 실험 기능이다([Epic: Unreal MCP in Unreal Editor](https://dev.epicgames.com/documentation/unreal-engine/unreal-mcp-in-unreal-editor)).
-- [미확인] 데이터 에셋이 다른 에셋에서 참조되지 않으면 쿠킹에서 빠질 수 있다. 11/18 첫 Shipping 12밤 완주에서 확인한다.
+- 나누는 일(11/17, 11/21 바꿈): 위젯 블루프린트는 AI가 Unreal MCP(UMG ToolSet)로 만들고 설정한다. 애니메이션 블루프린트는 MCP로 만들 수 없어 본인이 만든다(11/21). 이벤트 그래프는 비우고, 결과는 개수(Skeleton 1개, 바인딩 위젯 수, 이벤트 그래프 노드 0개)와 캡처로 확인한다. 받아들일지와 마지막 미세 조정은 본인이 한다. Unreal MCP는 실험 기능이다([Epic: Unreal MCP in Unreal Editor](https://dev.epicgames.com/documentation/unreal-engine/unreal-mcp-in-unreal-editor)).
+- 데이터 에셋은 쿠킹(cooking)이 요청한 패키지와 그 의존 패키지에만 들어간다. 5.8.4 쿠커는 요청이 하나도 없을 때만 프로젝트 Content 전체를 쿠킹하고(`Cook.CookAllByDefault`, `Engine/Source/Editor/UnrealEd/Private/CookOnTheFlyServer.cpp:255-261, 8944-8981`), 맵 목록 같은 요청이 하나라도 있으면 아무도 참조하지 않는 데이터 에셋은 빠진다. 코드에 경로 문자열로만 적은 참조는 쿠커가 보지 못한다. [미정] 데이터 에셋을 확실히 넣는 방법: Asset Manager의 `PrimaryAssetTypesToScan`에 `CookRule=AlwaysCook`으로 더하기(엔진이 권하는 방법, 같은 파일 8544-8546줄), `DirectoriesToAlwaysCook`에 폴더 넣기, 쿠킹되는 에셋에서 속성으로 참조하기. 확인: `tools\package.bat` 뒤 `Saved/StagedBuilds/Windows/Manifest_UFSFiles_Win64.txt`에 그 에셋(`RankAndFile/Content/...`)이 있는지 보고, 패키지에서 읽히는지 본다.
 
 ## 9. 테스트
 
@@ -604,10 +602,10 @@ T11은 11/18에 더했다. T2는 같은 빌드에서 두 번 돌리므로 빌드
 
 ### 9.4 작성과 실행
 
-- 테스트는 `IMPLEMENT_SIMPLE_AUTOMATION_TEST(클래스 이름, "RankAndFile.Core.Regression", 플래그)`로 쓴다. `RunTest`가 true를 돌려주면 통과다. 플래그는 실행 컨텍스트와 필터(EngineFilter, ProductFilter 등)를 합쳐 준다([Epic: Write C++ Tests](https://dev.epicgames.com/documentation/en-us/unreal-engine/write-cplusplus-tests-in-unreal-engine)).
+- 테스트는 `IMPLEMENT_SIMPLE_AUTOMATION_TEST(클래스 이름, "RankAndFile.Core.T1_Regression", 플래그)`로 쓴다. `RunTest`가 true를 돌려주면 통과다. 플래그는 실행 컨텍스트와 필터(EngineFilter, ProductFilter 등)를 합쳐 준다([Epic: Write C++ Tests](https://dev.epicgames.com/documentation/en-us/unreal-engine/write-cplusplus-tests-in-unreal-engine)).
 - 이름은 `RankAndFile.Core.*`, `RankAndFile.Content.*`, `RankAndFile.Run.*`로 나눈다. 한 줄 명령이 `RankAndFile` 전체를 돌린다.
 
-`tools/run_tests.bat` [제안]
+`tools/run_tests.bat`
 
 ```bat
 "%UE_ROOT%\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" "%CD%\RankAndFile.uproject" ^
@@ -618,7 +616,7 @@ T11은 11/18에 더했다. T2는 같은 빌드에서 두 번 돌리므로 빌드
 
 - `-ExecCmds`로 테스트를 돌리고 `Quit`으로 끝내는 방식과, 결과를 JSON으로 남기는 `-ReportExportPath`는 [Epic: Run Automation Tests](https://dev.epicgames.com/documentation/en-us/unreal-engine/run-automation-tests-in-unreal-engine)에 있다.
 - `-nullrhi`(렌더링 없이 실행), `-unattended`(대화 상자 없음), `-nosplash`, `-stdout`은 [Epic: Command-Line Arguments Reference](https://dev.epicgames.com/documentation/en-us/unreal-engine/unreal-engine-command-line-arguments-reference)에 있다.
-- [미확인] 위 명령 전체를 이 조합으로 돌려 보지는 않았다. 이전 프로젝트에서 쓴 nullrhi 헤드리스 실행 명령이 있으면 그것을 기준으로 맞춘다. 11/16 첫 실행에서 확인한다.
+- 위 명령은 2026-11-21에 돌려 확인했다(테스트 8개 실행, 보고서 `Saved/TestReport/index.json` 생성. 조건은 `docs/devlog/2026-11-21.md`). 실제 스크립트(`tools/run_tests.bat`)는 이 명령 뒤에 보고서를 읽어 판정한다. 테스트가 하나라도 실패하면 에디터 종료 코드는 255다(`Engine/Source/Developer/AutomationController/Private/AutomationCommandline.cpp:491-504`).
 
 ### 9.5 어긋났을 때
 
@@ -650,13 +648,15 @@ Shipping 결정성(T11)이 어긋나면
 
 ```mermaid
 flowchart LR
-  GEN["생성 (AI)<br>분대 60, 유물 30, 진형 90"] --> G1["관문 1 스키마<br>자동"]
+  GEN["생성 (AI)<br>분대 60, 유물 30"] --> G1["관문 1 스키마<br>자동"]
   G1 --> G2["관문 2 시뮬레이션<br>자동, 후보당 1만 판"]
   G2 --> G3["관문 3 플레이<br>사람"]
-  G3 --> IN["반영<br>분대 24, 유물 12, 진형 36"]
+  G3 --> IN["반영<br>분대 16, 유물 6, 진형 24"]
   G1 -.->|"탈락 사유"| GEN
   G2 -.->|"탈락 사유"| GEN
 ```
+
+해골 진형은 AI가 만들지 않고 `RankEditor`의 생성기가 만들어 관문 1·2를 거친다(11/20 결정, 11/21 결정 3 ⑨).
 
 | 관문 | 검사 | 통과 기준 [초기값] |
 |---|---|---|
@@ -665,10 +665,11 @@ flowchart LR
 | 2 독주 | 후보가 들어간 두 장 조합의 승률 | 어떤 조합도 70% 이하 |
 | 2 중복 | 기존 카드와 효과 벡터의 코사인 유사도 | 0.9 미만 |
 | 2 해골 진형 | 배정된 밤에서 탐색 봇의 승률 | 목표 곡선 ±5%p |
+| 2 다양성 [기록만] | 한 배치가 여러 밤을 이기는 비율 | 통과 기준이 아니다(11/21 결정 3 ⑪) |
 | 3 사람 | 설명만 읽고 효과를 예측해 실제와 비교, 고를 이유가 있는지 | 예측이 틀리면 효과를 고친다 |
 
 - 탐색 봇 (기획서 §3): 그 밤까지 무작위로 드래프트한 덱으로 무작위 배치 200개를 시험해 가장 나은 배치를 고른다.
-- 목표 곡선 (기획서 §3): 밤 1~12의 봇 승률 90, 86, 82, 70, 78, 74, 70, 58, 66, 60, 54, 45%.
+- 목표 곡선 (기획서 §3): 밤 1~12의 봇 승률 90, 86, 82, 70, 78, 74, 70, 58, 66, 60, 54, 45%. (11/21 결정 3 ⑪의 "직선 보간"은 옮겨 적은 오류라 이 곡선을 쓴다, 11/22)
 - 탈락 사유는 JSON으로 모아 다음 생성 요청에 붙이고, 회차별 통과율을 기록한다 (기획서 §5).
 - AI에게 맡기지 않는 것 (기획서 §5): 효과 코드, 카드 설명문, 최종 채택.
 
@@ -676,7 +677,7 @@ flowchart LR
 
 생성 전에 끝나 있어야 하는 것
 - 병과 수치 확정. 지금 수치로는 전원 척후 덱이 혼합 덱보다 잘 이긴다(`docs/balance-2026-11-15.md`). 기반이 어긋난 채로 카드를 걸러 내면 수치를 고친 뒤 전부 다시 돌려야 한다.
-- 시작 덱과 밤별 기대 덱 크기. 탐색 봇과 목표 곡선이 이것에 달려 있다.
+- 시작 덱과 밤별 기대 덱 크기. 탐색 봇과 목표 곡선이 이것에 달려 있다. [초기값]은 11/21 결정 3 ⑤(8.1절).
 - [제안] 관문 2에 병과 검사를 추가한다: 단일 병과 덱의 승률이 혼합 덱보다 낮을 것, 병과 1명당 가치의 편차.
 
 ## 11. BalanceSim 커맨들릿
@@ -722,6 +723,8 @@ AI 작업 규칙은 저장소 루트와 폴더마다 있는 `AGENTS.md` 10개에
 
 ## 13. 개발 순서
 
+13.1~13.4는 11/15에 세운 처음 계획이다. 11/20부터는 날짜가 아니라 루트 `AGENTS.md` 8절의 단계 순서를 따르고(11/20 결정), 범위는 11/21 범위 축소를 따른다. 13.4의 버리는 순서 가운데 1~5번은 11/21에 줄였고, 12밤은 줄이지 않기로 했다.
+
 ### 13.1 무엇이 무엇을 막는가
 
 ```mermaid
@@ -757,7 +760,7 @@ flowchart TD
 2. UE 5.8 C++ 프로젝트와 모듈 4개 뼈대. VS에서 빌드하고, 빈 Shipping 패키지를 한 번 만들어 실행한다. 캐릭터 GLB 2개(Knight, Skeleton_Minion)를 임포트해 Skeleton 공유와 애니메이션 재생을 확인한다(14.1절)
 3. `RankCore` 구현 순서(`docs/rules.md` 기준): 구조체와 데이터 → 링크 계산 → 유닛 생성 → 한 틱 처리 → 해시 → 판정 → 배치 판정
 4. 테스트 T2~T5, 본인 리뷰, 기준 확정, 회귀 테스트 결과 기록(T1), Shipping 패키지에서 Shipping 결정성 확인(T11)
-5. 배경 에셋 AI 생성(1시간 제한): 바닥 1장, 원경 1장. 8.6절의 선별 기준으로 고른다. 판정 A가 먼저다
+5. 배경 에셋 AI 생성(1시간 제한): 바닥 타일 2장(아군 쪽, 적 쪽), 원경 1장(`docs/background.md`). `docs/background.md`의 선별 기준으로 고른다. 판정 A가 먼저다
 6. 판정 A (밤): T5 전부, T2·T3 각 1,000/1,000, T4 10,000/10,000, 본인 리뷰 끝. 실패하면 9.5 절차
 
 끝났다는 증거: 테스트가 한 줄 명령으로 돌고 모두 통과한다. 빈 Shipping 빌드가 실행된다.
@@ -835,7 +838,7 @@ flowchart TD
 
 - 패키징은 `Engine/Build/BatchFiles/RunUAT.bat`의 `BuildCookRun`으로 한다. 빌드, 쿠킹, 스테이징, 패키지 단계를 한 명령으로 돈다([Epic: Build Operations](https://dev.epicgames.com/documentation/en-us/unreal-engine/build-operations-cooking-packaging-deploying-and-running-projects-in-unreal-engine)).
 - 인자를 손으로 쓰면 틀리기 쉬우므로 에디터의 실행 프로필(Custom Launch Profile)이 만들어 주는 명령을 `tools/package.bat`에 그대로 옮긴다. 같은 문서가 권하는 방법이다.
-- Epic 문서의 예시에는 `-clientconfig=Shipping -cook -build -stage -prereqs -pak -archive -archivedirectory=...` 조합이 나온다. [미확인] Windows 데스크톱에서 이 조합 그대로 되는지는 11/16 빈 프로젝트 패키징에서 확인한다.
+- `tools/package.bat`은 Epic 문서 예시(`-clientconfig=Shipping -cook -build -stage -prereqs -pak -archive -archivedirectory=...`) 대신 Project Launcher 프로필(Shipping, Win64, Pak Files, 보관 끔)이 만든 인자를 그대로 쓴다: `BuildCookRun -clientconfig=Shipping -serverconfig=Shipping -nocompileeditor -installed -platform=Win64 -build -cook -CookCultures=ko -unversionedcookedcontent -zenstore -pak -stage -compressed`(나머지 인자와 출처는 스크립트 주석). Launcher는 `-prereqs`와 `-archive`를 프로필에서 켰을 때만 붙인다(`Engine/Source/Developer/LauncherServices/Private/Launcher/LauncherWorker.cpp:1158-1161, 1182-1184`). 2026-11-20에 이 명령으로 Shipping 패키지가 만들어지고 실행됐다(`README.md` "Shipping 패키지").
 
 ### 14.1 UE 5.8 확인 항목 (11/16 첫 작업)
 
@@ -844,10 +847,10 @@ flowchart TD
 | 엔진 | 5.8은 2026-06-17 출시, 이후 5.8.1과 5.8.2 핫픽스가 나왔다([Epic 포럼: 5.8](https://forums.unrealengine.com/t/unreal-engine-5-8-released/2729274), [5.8.2](https://forums.unrealengine.com/t/5-8-2-hotfix-released/2746335)) | 최신 핫픽스로 설치 |
 | Visual Studio | 최소 VS 2022 17.14, 권장 VS 2026([Epic: 5.8 Release Notes](https://dev.epicgames.com/documentation/en-us/unreal-engine/unreal-engine-5-8-release-notes)). VS 2022에서 .NET 10 대상 오류가 났다는 보고([포럼](https://forums.unrealengine.com/t/ue-5-8-project-is-incompatible-with-vs/2838672))와 VS 2026에서 `hash_map` 헤더 컴파일 오류 보고([포럼](https://forums.unrealengine.com/t/ue-5-8-fails-to-compile-with-visual-studio-2026-hash-map-missing-source-fix/2732357))가 있다 | 빈 C++ 프로젝트 빌드 |
 | 패키징 | 새 5.8 프로젝트의 패키징 실패 보고가 있다([포럼](https://forums.unrealengine.com/t/ue5-8-packaging-fails-for-a-brand-new-project-has-anyone-packaged-successfully-please-help/2725168)). ScriptableToolsFramework 플러그인을 켜면 Shipping 빌드가 실패한다([UE-355270](https://issues.unrealengine.com/issue/UE-355270)) | 빈 Shipping 패키지 실행. 해당 플러그인은 켜지 않는다 |
-| Unreal MCP (11/17) | 실험 기능. 본체는 기본으로 켜져 있고 도구 묶음 플러그인은 직접 켠다. 쿠킹한 Shipping 빌드도 MCP 서버를 띄울 수 있다([Epic: Unreal MCP](https://dev.epicgames.com/documentation/unreal-engine/unreal-mcp-in-unreal-editor)). 결정: 도구 묶음만 플러그인 금지의 예외로 켜고, Shipping에서는 뺀다. [미확인] 빼는 설정 위치(플러그인 대상 설정 또는 서버 자동 시작) | 도구 묶음을 켠 뒤 빈 Shipping 패키지 실행. 그 패키지에서 `127.0.0.1:8000`에 서버가 뜨지 않는지 확인 |
+| Unreal MCP (11/17, 11/21 바꿈) | 실험 기능. 플러그인 이름은 `ModelContextProtocol`(표시 이름 "Unreal MCP"). 5.8.4에서는 본체도 기본으로 꺼져 있다(`Engine/Plugins/Experimental/ModelContextProtocol/ModelContextProtocol.uplugin:18` `"EnabledByDefault": false`. 5.8 문서도 플러그인 창에서 켜는 것으로 시작한다). 본체에 Runtime 모듈 2개가 있고, 문서는 쿠킹·Shipping 빌드도 코드가 서버를 시작하면 MCP 서버를 띄울 수 있다고 적는다([Epic: Unreal MCP (5.8)](https://dev.epicgames.com/documentation/unreal-engine/unreal-mcp-in-unreal-editor?application_version=5.8)). 서버 자동 시작은 기본 꺼짐(`ModelContextProtocolSettings.h:42`). 결정(11/21): `ModelContextProtocol`, `UMGToolSet`, `EditorToolset`을 켜고, `.uproject`의 플러그인 항목마다 `"TargetAllowList": ["Editor"]`를 달아 게임 대상에서 뺀다(UBT `PluginReferenceDescriptor.cs:405-420`, `UEBuildTarget.cs:5840-5843`). 의존 넷 가운데 `ToolsetRegistry`가 새로 켜지고, `PythonScriptPlugin`·`EditorScriptingUtilities`·`FileSandbox`는 엔진 기본 플러그인이 이미 켜고 있다. 11/21 확인: 빈 Shipping 패키지가 만들어지고 실행되며, Shipping receipt·실행 파일·스테이징 목록이 켜기 전과 같고 실행 중 `:8000`이 열리지 않는다(11/21 일지) | 켠 직후 빈 Shipping 패키지 실행. 그 패키지에서 `127.0.0.1:8000`에 서버가 뜨지 않는지, 스테이징 폴더에 MCP 파일이 없는지 확인 |
 | 렌더링 | 5.8 문서 기준으로 Lumen은 DX12·SM6와 RTX 2000급 이상, Nanite와 가상 그림자는 SM6.6이 필요하다([Epic: 하드웨어 사양 5.8](https://dev.epicgames.com/documentation/unreal-engine/hardware-and-software-specifications-for-unreal-engine?application_version=5.8)) | 프로젝트에서 셋 다 끈다(`docs/background.md` 2.4절) |
-| 에셋 | KayKit GLB는 glTF 2.0, 정점당 본 영향 최대 4개라 5.8 glTF 임포터의 영향 수 제한 문제([포럼](https://forums.unrealengine.com/t/interchange-gltf-importer-truncates-skeletal-mesh-bone-influences-to-4-per-vertex/2745391))와 무관하다(8.6절) | GLB 2개 임포트, Skeleton 공유, 애니메이션 재생 |
-| Shipping 결정성 (11/18) | T11은 Shipping 실행 파일이 실행 인자와 입력 파일을 읽고 결과 파일을 써야 한다. [미확인] Shipping에서 실행 인자 처리, 파일을 쓸 수 있는 위치, 로그가 꺼지는지, 종료 코드를 돌려주는 방법 | 엔진 소스에서 확인하고 빈 Shipping 패키지에서 시험 |
+| 에셋 | KayKit GLB는 glTF 2.0, 정점당 본 영향 최대 4개라 5.8 glTF 임포터의 영향 수 제한 문제([포럼](https://forums.unrealengine.com/t/interchange-gltf-importer-truncates-skeletal-mesh-bone-influences-to-4-per-vertex/2745391))와 무관하다(8.6절). 5.8.4에서 glTF 임포트는 기본으로 켜진 Interchange(`Engine/Plugins/Interchange/Runtime/Interchange.uplugin` 13줄)가 하고, 새 플러그인은 필요 없다. MCP 도구 묶음의 스켈레탈 메시 임포트 도구는 FBX 전용이라 GLB를 받지 않는다(`EditorToolset`의 `skeletal_mesh.py` 50~64줄). [측정: 11/21~22, GLB JSON 청크] 9종 모두 `JOINTS_1`이 없고 관절 41개의 이름과 순서가 같다 | GLB 2개 임포트, Skeleton 공유, 애니메이션 재생 |
+| Shipping 결정성 (11/18) | T11은 Shipping 실행 파일이 실행 인자와 입력 파일을 읽고 결과 파일을 써야 한다. 11/21 엔진 소스로 확인했다(`docs/review/t11-shipping-investigation-2026-11-21.md`): 실행 인자는 그대로 읽히고, 결과 파일은 인자로 받은 절대 경로에 쓰고, 로그는 꺼져 있고(설치형 엔진에서는 켤 수 없다), 종료 코드는 `RequestExitWithStatus(true, 코드)`로 돌려준다. 11/20 Shipping 패키지 실행 뒤 사용자 폴더의 `Saved`에 설정 파일만 생기고 `Logs`가 비어 있었다. 설계는 11/21 결정 5. [미확인] T11 코드를 넣은 실제 패키지에서의 시험 | 엔진 소스에서 확인하고 빈 Shipping 패키지에서 시험 |
 | AI 코딩 도구 | [판단] 5.8 출시 이후 변경을 모르고 이전 API를 제안할 수 있다 | 컴파일 오류로 드러난다. 엔진 소스와 문서로 확인한다 |
 
 ~~세 확인(빌드, Shipping 패키지, GLB 임포트)이 2시간 안에 끝나지 않으면 17절의 대응대로 5.6으로 돌아간다 [제안].~~ **11/17 폐기**: 5.8 확정. 5.6으로 돌아가지 않는다(`docs/decisions.md`).
@@ -859,24 +862,24 @@ Shipping에서만 깨지기 쉬운 곳 [판단]
 
 패키지는 직접 시연용이고, 외부에는 영상과 README 링크로 보여 준다.
 
-## 15. 결정이 필요한 것 [미정]
+## 15. 결정이 필요한 것 (11/21까지 모두 정함)
 
 | # | 결정할 것 | 언제까지 | 참고 |
 |---|---|---|---|
 | 1 | ~~병과 수치 조정 여부~~ **11/17 결정: 조정안 채택**(척후 간격 9·체력 18, 석궁수 공격 4, 마법사 공격 3). 기본 덱 승률이 올라가므로 해골 진형은 11/19 생성에서 목표 곡선에 맞춘다 | 끝남 | `docs/decisions.md` |
-| 2 | 시작 덱, 밤별 기대 덱 크기, 보상에서 분대와 유물의 비율 | 11/18 런 루프 전 | `docs/balance-2026-11-15.md` 2.3절: 지금 진형은 덱 11명 안팎에서 목표 승률이 맞는다 |
-| 3 | 특성과 유물의 처리 시점(6.8)과 조각 수. 시간이 모자라면 16개를 줄인다 | 11/18 | 일정표에 구현 작업이 없었다 |
-| 4 | 새벽 규칙을 둘지. 지금 수치로는 600틱에 닿는 전투가 거의 없다 | 11/19 유물 생성 전 | `docs/balance-2026-11-15.md` 2.4절 |
-| 5 | 배치 입력 방식: UMG 격자(제안) 또는 3D 판 위 직접 조작 | 11/17 | 8.3절 |
-| 6 | 위젯 배치를 처음부터 위젯 블루프린트 디자이너로 할지, 코드로 배치하고 조정값만 열어 둘지 (11/17 결정 두 건으로 질문이 바뀜) | 11/17 | 8.4절 |
-| 7 | 저장과 이어하기를 만들지 | 11/18 | 버리는 순서 3번 |
+| 2 | **11/21 결정 3 ⑤: [초기값] 분대 3개, 보상 3장 중 1장, 분대:유물 2:1, 기대 덱 6·10·12명** 시작 덱, 밤별 기대 덱 크기, 보상에서 분대와 유물의 비율 | 끝남 | `docs/balance-2026-11-15.md` 2.3절: 지금 진형은 덱 11명 안팎에서 목표 승률이 맞는다 |
+| 3 | **11/22: `docs/rules.md` §10, 조각 16개** 특성과 유물의 처리 시점(6.8)과 조각 수. 시간이 모자라면 16개를 줄인다 | 끝남 | 일정표에 구현 작업이 없었다 |
+| 4 | **11/21 결정 3 ⑦: 지금 규칙 유지, 최대 틱을 바꾸는 유물은 만들지 않음** 새벽 규칙을 둘지. 지금 수치로는 600틱에 닿는 전투가 거의 없다 | 끝남 | `docs/balance-2026-11-15.md` 2.4절 |
+| 5 | **11/21 결정 3 ③: 3D 판 위 클릭** 배치 입력 방식: UMG 격자(제안) 또는 3D 판 위 직접 조작 | 끝남 | 8.3절 |
+| 6 | **11/21 결정 3 ④: 디자이너(위젯 블루프린트)** 위젯 배치를 처음부터 위젯 블루프린트 디자이너로 할지, 코드로 배치하고 조정값만 열어 둘지 (11/17 결정 두 건으로 질문이 바뀜) | 끝남 | 8.4절 |
+| 7 | **11/21 범위 축소: 만들지 않음** 저장과 이어하기를 만들지 | 끝남 | 버리는 순서 3번 |
 | 8 | (이 저장소 밖 기획서의 정리. 여기서는 다루지 않는다) | | |
 
 ## 16. 검증 기록 (README로 옮길 표)
 
-기획서 §10의 '제작 후 채울 것'을 새 일정에 맞췄다. 빈칸은 제작 중에 [측정] 값으로 채운다. 제작 전 수치를 결과처럼 쓰지 않는다.
+기획서 §10의 '제작 후 채울 것'을 항목과 기준으로 옮겼다. 결과는 `README.md`의 검증 기록에만 [측정] 값으로 적는다(11/22 결정). '계획한 날' 열은 11/15에 세운 처음 계획이다. 제작 전 수치를 결과처럼 쓰지 않는다.
 
-| 항목 | 기준 | 결과 | 기록일 |
+| 항목 | 기준 | 결과 | 계획한 날 |
 |---|---|---|---|
 | 손계산 시나리오 | 전부 일치 (개수) | | 11/17 |
 | 회귀 테스트 | 기준 확정 커밋, 20/20 | | 11/17 |
