@@ -7,6 +7,7 @@
 - 방법: `git filter-branch --msg-filter`, 대상은 모든 로컬 브랜치(`main`, `chore/agents-md`, `feat/rules-and-rankcore`).
 - 백업: 다시 쓰기 전의 브랜치는 `refs/original-2026-11-21/`에 있다. 11/20 백업(`refs/original/`)은 그대로다.
 - 원격: 원격(`origin`)에 반영하려면 세 브랜치를 강제 푸시해야 한다. 이 표를 쓸 때는 하지 않았다.
+- 원격 반영(같은 날 덧붙임): `main`과 `feat/rules-and-rankcore`를 강제 푸시했다. `chore/agents-md`는 본인이 원격에서 지웠다(`docs/decisions.md` 11/21 행).
 - 문서에 적힌 옛 해시는 새 해시로 고쳤다(`docs/decisions.md`, `docs/devlog/2026-11-16.md`~`2026-11-20.md`, `docs/review/`의 11/20 검토 문서 두 개).
 
 오래된 커밋부터 적는다.
