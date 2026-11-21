@@ -170,7 +170,7 @@ namespace Rank
 	// §5.2 플레이어 기준 판정
 	enum class EVerdictKind : uint8
 	{
-		None,          // 입력 오류
+		None,          // 입력 오류(§3.6). 판정하지 않았다(FVerdict::bJudged가 false)
 		Annihilation,  // 섬멸
 		BarrierBreak,  // 결계 파괴
 		Dawn,          // 새벽
@@ -179,9 +179,11 @@ namespace Rank
 		Wiped,         // 전멸
 	};
 
+	// §5.2 입력 오류(§3.6)는 판정하지 않는다. 승리도 패배도 아니다(2026-11-20 결정).
 	struct FVerdict
 	{
-		bool bWin = false;
-		EVerdictKind Kind = EVerdictKind::None;
+		bool bJudged = false;  // 코어 결과가 A, B, Draw, Timeout이면 true, Invalid(입력 오류)면 false
+		bool bWin = false;     // bJudged가 false면 bWin을 쓰지 않는다. 게임은 패배로 세지 않는다(§5.2)
+		EVerdictKind Kind = EVerdictKind::None;  // bJudged가 false면 None
 	};
 }

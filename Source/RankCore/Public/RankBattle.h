@@ -18,6 +18,6 @@ namespace Rank
 	// bRecordLog는 로그를 채울지만 정하고, 결과와 해시는 바꾸지 않는다.
 	RANKCORE_API FBattleResult Simulate(const FBattleInput& Input, bool bRecordLog);
 
-	// §5.2 코어 결과를 플레이어 기준 승패와 종류로 바꾼다.
+	// §5.2 코어 결과를 플레이어 기준 승패와 종류로 바꾼다. 입력 오류(Invalid, §3.6)는 판정하지 않는다(bJudged가 false).
 	RANKCORE_API FVerdict Judge(const FBattleResult& Result);
 }
